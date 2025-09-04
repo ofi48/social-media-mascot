@@ -111,6 +111,8 @@ interface VideoProcessingContextType {
   // UI State
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
+  processingProgress: number;
+  setProcessingProgress: (progress: number) => void;
 }
 
 const defaultParameters: ProcessingParameters = {
@@ -154,6 +156,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
   const [results, setResults] = useState<ProcessedResult[]>([]);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
 
   const updateParameter = (key: string, value: any) => {
     setParameters(prev => ({
@@ -227,6 +230,10 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
           startTime = 0;
           endTime = Math.min(video.duration, 5); // Default to 5 seconds max
         }
+
+        // Limit clip length for reliability
+        const maxClipSeconds = 3;
+        endTime = Math.min(endTime, startTime + maxClipSeconds);
         
         const duration = endTime - startTime;
         if (duration <= 0) {
@@ -394,14 +401,15 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       setTimeout(() => {
         URL.revokeObjectURL(videoUrl);
         reject(new Error('Video processing timeout'));
-      }, 30000); // 30 second timeout
+      }, 12000); // 12 second timeout
     });
   };
 
   const processVideo = async (file: File, variations: number) => {
     setIsProcessing(true);
+    setProcessingProgress(0);
     try {
-      const variants = [];
+      const variants = [] as any[];
       
       for (let i = 0; i < variations; i++) {
         try {
@@ -428,6 +436,10 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             parameters: { ...parameters },
             originalFile: file
           });
+        } finally {
+          // Update progress regardless of success/failure
+          const pct = Math.round(((i + 1) / variations) * 100);
+          setProcessingProgress(pct);
         }
       }
       
@@ -439,6 +451,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       };
       
       addResult(result);
+      setProcessingProgress(100);
     } finally {
       setIsProcessing(false);
     }
@@ -512,7 +525,9 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       loadPreset,
       deletePreset,
       isProcessing,
-      setIsProcessing
+      setIsProcessing,
+      processingProgress,
+      setProcessingProgress
     }}>
       {children}
     </VideoProcessingContext.Provider>
