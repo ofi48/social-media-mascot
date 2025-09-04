@@ -189,142 +189,199 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
   const applyVideoProcessing = async (file: File, params: ProcessingParameters): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
       video.crossOrigin = 'anonymous';
       video.muted = true;
+      video.preload = 'metadata';
       
       const videoUrl = URL.createObjectURL(file);
       video.src = videoUrl;
       
       video.onloadedmetadata = () => {
-        // Set canvas dimensions
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          URL.revokeObjectURL(videoUrl);
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        // Set canvas dimensions based on parameters
         canvas.width = params.customPixelSize.enabled ? params.customPixelSize.width : video.videoWidth;
         canvas.height = params.customPixelSize.enabled ? params.customPixelSize.height : video.videoHeight;
         
-        // Calculate trim timing
-        const startTime = params.trimStart.enabled ? 
-          Math.random() * (params.trimStart.max - params.trimStart.min) + params.trimStart.min : 0;
-        const endTime = params.trimEnd.enabled ? 
-          video.duration - (Math.random() * (params.trimEnd.max - params.trimEnd.min) + params.trimEnd.min) : video.duration;
+        // Calculate trim timing with validation
+        let startTime = 0;
+        let endTime = video.duration;
+        
+        if (params.trimStart.enabled && video.duration > params.trimStart.max) {
+          startTime = Math.random() * (params.trimStart.max - params.trimStart.min) + params.trimStart.min;
+        }
+        
+        if (params.trimEnd.enabled && video.duration > params.trimEnd.max) {
+          endTime = video.duration - (Math.random() * (params.trimEnd.max - params.trimEnd.min) + params.trimEnd.min);
+        }
+        
+        // Ensure valid time range
+        if (startTime >= endTime) {
+          startTime = 0;
+          endTime = Math.min(video.duration, 5); // Default to 5 seconds max
+        }
+        
+        const duration = endTime - startTime;
+        if (duration <= 0) {
+          URL.revokeObjectURL(videoUrl);
+          reject(new Error('Invalid video duration for processing'));
+          return;
+        }
         
         video.currentTime = startTime;
         
         video.onseeked = () => {
-          const mediaRecorder = new MediaRecorder(canvas.captureStream(25), {
-            mimeType: 'video/webm;codecs=vp9'
-          });
-          
-          const chunks: Blob[] = [];
-          
-          mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-              chunks.push(event.data);
-            }
-          };
-          
-          mediaRecorder.onstop = () => {
-            const processedBlob = new Blob(chunks, { type: 'video/webm' });
-            URL.revokeObjectURL(videoUrl);
-            resolve(processedBlob);
-          };
-          
-          mediaRecorder.start();
-          
-          const renderFrame = () => {
-            if (video.currentTime >= endTime) {
-              mediaRecorder.stop();
-              return;
+          try {
+            // Set up MediaRecorder with fallback codec
+            let mediaRecorder;
+            const stream = canvas.captureStream(25);
+            
+            if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+              mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+            } else if (MediaRecorder.isTypeSupported('video/webm')) {
+              mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            } else {
+              mediaRecorder = new MediaRecorder(stream);
             }
             
-            if (ctx) {
-              // Apply transformations and effects
+            const chunks: Blob[] = [];
+            let frameCount = 0;
+            const maxFrames = Math.ceil(duration * 25); // 25 FPS
+            
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                chunks.push(event.data);
+              }
+            };
+            
+            mediaRecorder.onstop = () => {
+              const processedBlob = new Blob(chunks, { type: 'video/webm' });
+              URL.revokeObjectURL(videoUrl);
+              resolve(processedBlob);
+            };
+            
+            mediaRecorder.onerror = (event) => {
+              URL.revokeObjectURL(videoUrl);
+              reject(new Error('MediaRecorder error: ' + event));
+            };
+            
+            mediaRecorder.start();
+            
+            const renderFrame = () => {
+              frameCount++;
+              
+              // Stop if we've reached the end time or max frames
+              if (video.currentTime >= endTime || frameCount >= maxFrames) {
+                mediaRecorder.stop();
+                return;
+              }
+              
+              // Apply transformations and draw frame
               ctx.save();
               
-              // Clear canvas
-              ctx.fillStyle = '#000';
+              // Clear canvas with black background
+              ctx.fillStyle = '#000000';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
+              
+              // Apply transformations
+              ctx.translate(canvas.width / 2, canvas.height / 2);
               
               // Apply rotation if enabled
               if (params.rotation.enabled) {
                 const rotation = Math.random() * (params.rotation.max - params.rotation.min) + params.rotation.min;
-                ctx.translate(canvas.width / 2, canvas.height / 2);
                 ctx.rotate((rotation * Math.PI) / 180);
-                ctx.translate(-canvas.width / 2, -canvas.height / 2);
               }
               
-              // Apply zoom if enabled
+              // Apply zoom and flip
               let scaleX = 1, scaleY = 1;
               if (params.zoom.enabled) {
                 const zoom = Math.random() * (params.zoom.max - params.zoom.min) + params.zoom.min;
                 scaleX = scaleY = zoom;
               }
               
-              // Apply horizontal flip if enabled
               if (params.flipHorizontal) {
                 scaleX *= -1;
-                ctx.translate(canvas.width, 0);
               }
               
               ctx.scale(scaleX, scaleY);
               
-              // Draw video frame
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              
-              // Apply color adjustments
-              if (params.brightness.enabled || params.contrast.enabled || params.saturation.enabled) {
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
-                
-                const brightness = params.brightness.enabled ? 
-                  Math.random() * (params.brightness.max - params.brightness.min) + params.brightness.min : 0;
-                const contrast = params.contrast.enabled ? 
-                  Math.random() * (params.contrast.max - params.contrast.min) + params.contrast.min : 1;
-                
-                for (let i = 0; i < data.length; i += 4) {
-                  // Apply brightness and contrast
-                  data[i] = Math.max(0, Math.min(255, (data[i] - 128) * contrast + 128 + brightness * 255));
-                  data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - 128) * contrast + 128 + brightness * 255));
-                  data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - 128) * contrast + 128 + brightness * 255));
-                }
-                
-                ctx.putImageData(imageData, 0, 0);
-              }
-              
-              // Apply noise if enabled
-              if (params.noise.enabled) {
-                const noiseLevel = Math.random() * (params.noise.max - params.noise.min) + params.noise.min;
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
-                
-                for (let i = 0; i < data.length; i += 4) {
-                  const noise = (Math.random() - 0.5) * noiseLevel * 255;
-                  data[i] = Math.max(0, Math.min(255, data[i] + noise));
-                  data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-                  data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
-                }
-                
-                ctx.putImageData(imageData, 0, 0);
-              }
+              // Draw video frame centered
+              const drawWidth = canvas.width;
+              const drawHeight = canvas.height;
+              ctx.drawImage(video, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
               
               ctx.restore();
-            }
+              
+              // Apply post-processing effects (simplified)
+              if (params.brightness.enabled || params.contrast.enabled || params.noise.enabled) {
+                try {
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const data = imageData.data;
+                  
+                  const brightness = params.brightness.enabled ? 
+                    Math.random() * (params.brightness.max - params.brightness.min) + params.brightness.min : 0;
+                  const contrast = params.contrast.enabled ? 
+                    Math.random() * (params.contrast.max - params.contrast.min) + params.contrast.min : 1;
+                  const noiseLevel = params.noise.enabled ? 
+                    Math.random() * (params.noise.max - params.noise.min) + params.noise.min : 0;
+                  
+                  for (let i = 0; i < data.length; i += 4) {
+                    // Apply brightness and contrast
+                    if (params.brightness.enabled || params.contrast.enabled) {
+                      data[i] = Math.max(0, Math.min(255, (data[i] - 128) * contrast + 128 + brightness * 255));
+                      data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - 128) * contrast + 128 + brightness * 255));
+                      data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - 128) * contrast + 128 + brightness * 255));
+                    }
+                    
+                    // Apply noise
+                    if (params.noise.enabled) {
+                      const noise = (Math.random() - 0.5) * noiseLevel * 255;
+                      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+                      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+                      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+                    }
+                  }
+                  
+                  ctx.putImageData(imageData, 0, 0);
+                } catch (error) {
+                  console.warn('Error applying post-processing effects:', error);
+                }
+              }
+              
+              // Advance to next frame
+              const speed = params.speed.enabled ? 
+                Math.random() * (params.speed.max - params.speed.min) + params.speed.min : 1;
+              video.currentTime += (1/25) * speed; // 25 FPS
+              
+              // Continue rendering if within bounds
+              if (video.currentTime < endTime && frameCount < maxFrames) {
+                requestAnimationFrame(renderFrame);
+              } else {
+                // Ensure MediaRecorder stops
+                setTimeout(() => {
+                  if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                  }
+                }, 100);
+              }
+            };
             
-            // Advance to next frame
-            const speed = params.speed.enabled ? 
-              Math.random() * (params.speed.max - params.speed.min) + params.speed.min : 1;
-            video.currentTime += (1/25) * speed; // 25 FPS
+            // Start rendering after a small delay
+            setTimeout(() => {
+              renderFrame();
+            }, 100);
             
-            if (video.currentTime < endTime) {
-              requestAnimationFrame(renderFrame);
-            } else {
-              mediaRecorder.stop();
-            }
-          };
-          
-          // Start rendering
-          renderFrame();
+          } catch (error) {
+            URL.revokeObjectURL(videoUrl);
+            reject(error);
+          }
         };
       };
       
@@ -332,6 +389,12 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         URL.revokeObjectURL(videoUrl);
         reject(new Error('Error loading video'));
       };
+      
+      // Add timeout to prevent infinite hanging
+      setTimeout(() => {
+        URL.revokeObjectURL(videoUrl);
+        reject(new Error('Video processing timeout'));
+      }, 30000); // 30 second timeout
     });
   };
 
