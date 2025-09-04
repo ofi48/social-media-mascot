@@ -11,13 +11,43 @@ export const ResultsTab = () => {
   const { results, clearResults } = useVideoProcessing();
   const [selectedResult, setSelectedResult] = useState<any>(null);
 
-  const handleDownload = (url: string, filename: string) => {
-    // Mock download functionality
-    toast.success(`Downloading ${filename}...`);
+  const handleDownload = (variant: any, originalFile?: File) => {
+    try {
+      // Use the original file if available, otherwise create a mock download
+      const file = originalFile || variant.originalFile;
+      if (file) {
+        const blob = new Blob([file], { type: file.type });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = variant.filename;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast.success(`Downloading ${variant.filename}...`);
+      } else {
+        // Fallback for cases where original file is not available
+        toast.error("Original file not available for download");
+      }
+    } catch (error) {
+      toast.error(`Failed to download ${variant.filename}`);
+      console.error('Download error:', error);
+    }
   };
 
   const handleDownloadAll = (result: any) => {
-    toast.success(`Downloading all variants for ${result.originalFilename}...`);
+    toast.success(`Preparing ${result.variants.length} downloads...`);
+    
+    result.variants.forEach((variant: any, index: number) => {
+      setTimeout(() => {
+        handleDownload(variant);
+      }, index * 500); // Stagger downloads to avoid browser blocking
+    });
   };
 
   const handlePreview = (variant: any) => {
@@ -158,7 +188,7 @@ export const ResultsTab = () => {
                               variant="default"
                               size="sm"
                               className="flex-1"
-                              onClick={() => handleDownload(variant.url, variant.filename)}
+                              onClick={() => handleDownload(variant)}
                             >
                               <Download className="mr-1 h-3 w-3" />
                               Download
@@ -193,7 +223,7 @@ export const ResultsTab = () => {
                     {formatFileSize(Math.random() * 50 * 1024 * 1024)}
                   </p>
                 </div>
-                <Button onClick={() => handleDownload(selectedResult.url, selectedResult.filename)}>
+                <Button onClick={() => handleDownload(selectedResult)}>
                   <Download className="mr-2 h-4 w-4" />
                   Download
                 </Button>

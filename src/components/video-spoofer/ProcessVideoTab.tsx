@@ -54,27 +54,48 @@ export const ProcessVideoTab = () => {
     }
   };
 
-  const handleDownloadAll = () => {
+  const handleDownloadAll = async () => {
     if (!lastProcessedResult) return;
     
-    // Create download links for all variations
-    lastProcessedResult.variants.forEach((variant: any, index: number) => {
-      // In a real implementation, these would be actual video URLs
-      const link = document.createElement('a');
-      link.href = variant.url;
-      link.download = variant.filename;
-      link.click();
-    });
+    toast.success(`Preparing ${lastProcessedResult.variants.length} video downloads...`);
     
-    toast.success(`Downloading ${lastProcessedResult.variants.length} video variations...`);
+    // Download each variation with a small delay to avoid browser blocking
+    for (let i = 0; i < lastProcessedResult.variants.length; i++) {
+      const variant = lastProcessedResult.variants[i];
+      setTimeout(() => {
+        downloadVideoFile(variant.filename, selectedFiles[0]);
+      }, i * 500); // 500ms delay between downloads
+    }
   };
 
   const handleDownloadSingle = (variant: any) => {
-    const link = document.createElement('a');
-    link.href = variant.url;
-    link.download = variant.filename;
-    link.click();
+    downloadVideoFile(variant.filename, selectedFiles[0]);
     toast.success(`Downloading ${variant.filename}...`);
+  };
+
+  const downloadVideoFile = (filename: string, originalFile: File) => {
+    try {
+      // Create a copy of the original file with the new name
+      const blob = new Blob([originalFile], { type: originalFile.type });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up URL object
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(`Failed to download ${filename}`);
+      console.error('Download error:', error);
+    }
   };
 
   return (

@@ -196,12 +196,19 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       const result: ProcessedResult = {
         id: Math.random().toString(36).substr(2, 9),
         originalFilename: file.name,
-        variants: Array.from({ length: variations }, (_, i) => ({
-          id: Math.random().toString(36).substr(2, 9),
-          url: URL.createObjectURL(file), // Mock URL
-          filename: `${file.name.split('.')[0]}_variant_${i + 1}.mp4`,
-          parameters: { /* processed parameters */ }
-        })),
+        variants: Array.from({ length: variations }, (_, i) => {
+          // Create a blob URL for each variant using the original file
+          const blob = new Blob([file], { type: file.type });
+          const url = URL.createObjectURL(blob);
+          
+          return {
+            id: Math.random().toString(36).substr(2, 9),
+            url: url,
+            filename: `${file.name.split('.')[0]}_variant_${i + 1}.mp4`,
+            parameters: { /* processed parameters */ },
+            originalFile: file // Store reference to original file for downloads
+          };
+        }),
         timestamp: new Date()
       };
       
