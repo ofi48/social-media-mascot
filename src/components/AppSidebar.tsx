@@ -10,7 +10,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
 
 const tools = [
@@ -21,8 +20,6 @@ const tools = [
 
 export function AppSidebar() {
   const location = useLocation();
-  const currentPath = location.pathname;
-  const isActive = (path: string) => currentPath === path;
 
   return (
     <Sidebar collapsible="icon">
@@ -33,7 +30,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {tools.map((tool) => (
                 <SidebarMenuItem key={tool.title}>
-                  <SidebarMenuButton asChild isActive={isActive(tool.url)}>
+                  <SidebarMenuButton asChild isActive={location.pathname === tool.url}>
                     <NavLink to={tool.url}>
                       <tool.icon />
                       <span>{tool.title}</span>
