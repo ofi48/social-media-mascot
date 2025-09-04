@@ -186,29 +186,192 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
     ));
   };
 
+  const applyVideoProcessing = async (file: File, params: ProcessingParameters): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      
+      const videoUrl = URL.createObjectURL(file);
+      video.src = videoUrl;
+      
+      video.onloadedmetadata = () => {
+        // Set canvas dimensions
+        canvas.width = params.customPixelSize.enabled ? params.customPixelSize.width : video.videoWidth;
+        canvas.height = params.customPixelSize.enabled ? params.customPixelSize.height : video.videoHeight;
+        
+        // Calculate trim timing
+        const startTime = params.trimStart.enabled ? 
+          Math.random() * (params.trimStart.max - params.trimStart.min) + params.trimStart.min : 0;
+        const endTime = params.trimEnd.enabled ? 
+          video.duration - (Math.random() * (params.trimEnd.max - params.trimEnd.min) + params.trimEnd.min) : video.duration;
+        
+        video.currentTime = startTime;
+        
+        video.onseeked = () => {
+          const mediaRecorder = new MediaRecorder(canvas.captureStream(25), {
+            mimeType: 'video/webm;codecs=vp9'
+          });
+          
+          const chunks: Blob[] = [];
+          
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              chunks.push(event.data);
+            }
+          };
+          
+          mediaRecorder.onstop = () => {
+            const processedBlob = new Blob(chunks, { type: 'video/webm' });
+            URL.revokeObjectURL(videoUrl);
+            resolve(processedBlob);
+          };
+          
+          mediaRecorder.start();
+          
+          const renderFrame = () => {
+            if (video.currentTime >= endTime) {
+              mediaRecorder.stop();
+              return;
+            }
+            
+            if (ctx) {
+              // Apply transformations and effects
+              ctx.save();
+              
+              // Clear canvas
+              ctx.fillStyle = '#000';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              
+              // Apply rotation if enabled
+              if (params.rotation.enabled) {
+                const rotation = Math.random() * (params.rotation.max - params.rotation.min) + params.rotation.min;
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate((rotation * Math.PI) / 180);
+                ctx.translate(-canvas.width / 2, -canvas.height / 2);
+              }
+              
+              // Apply zoom if enabled
+              let scaleX = 1, scaleY = 1;
+              if (params.zoom.enabled) {
+                const zoom = Math.random() * (params.zoom.max - params.zoom.min) + params.zoom.min;
+                scaleX = scaleY = zoom;
+              }
+              
+              // Apply horizontal flip if enabled
+              if (params.flipHorizontal) {
+                scaleX *= -1;
+                ctx.translate(canvas.width, 0);
+              }
+              
+              ctx.scale(scaleX, scaleY);
+              
+              // Draw video frame
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              // Apply color adjustments
+              if (params.brightness.enabled || params.contrast.enabled || params.saturation.enabled) {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                const brightness = params.brightness.enabled ? 
+                  Math.random() * (params.brightness.max - params.brightness.min) + params.brightness.min : 0;
+                const contrast = params.contrast.enabled ? 
+                  Math.random() * (params.contrast.max - params.contrast.min) + params.contrast.min : 1;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                  // Apply brightness and contrast
+                  data[i] = Math.max(0, Math.min(255, (data[i] - 128) * contrast + 128 + brightness * 255));
+                  data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - 128) * contrast + 128 + brightness * 255));
+                  data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - 128) * contrast + 128 + brightness * 255));
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+              }
+              
+              // Apply noise if enabled
+              if (params.noise.enabled) {
+                const noiseLevel = Math.random() * (params.noise.max - params.noise.min) + params.noise.min;
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                  const noise = (Math.random() - 0.5) * noiseLevel * 255;
+                  data[i] = Math.max(0, Math.min(255, data[i] + noise));
+                  data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+                  data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+              }
+              
+              ctx.restore();
+            }
+            
+            // Advance to next frame
+            const speed = params.speed.enabled ? 
+              Math.random() * (params.speed.max - params.speed.min) + params.speed.min : 1;
+            video.currentTime += (1/25) * speed; // 25 FPS
+            
+            if (video.currentTime < endTime) {
+              requestAnimationFrame(renderFrame);
+            } else {
+              mediaRecorder.stop();
+            }
+          };
+          
+          // Start rendering
+          renderFrame();
+        };
+      };
+      
+      video.onerror = () => {
+        URL.revokeObjectURL(videoUrl);
+        reject(new Error('Error loading video'));
+      };
+    });
+  };
+
   const processVideo = async (file: File, variations: number) => {
-    // Mock processing implementation
     setIsProcessing(true);
     try {
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      const variants = [];
+      
+      for (let i = 0; i < variations; i++) {
+        try {
+          const processedBlob = await applyVideoProcessing(file, parameters);
+          const url = URL.createObjectURL(processedBlob);
+          
+          variants.push({
+            id: Math.random().toString(36).substr(2, 9),
+            url: url,
+            filename: `${file.name.split('.')[0]}_variant_${i + 1}.webm`,
+            parameters: { ...parameters },
+            originalFile: processedBlob
+          });
+        } catch (error) {
+          console.error(`Error processing variant ${i + 1}:`, error);
+          // Create fallback variant with original file
+          const blob = new Blob([file], { type: file.type });
+          const url = URL.createObjectURL(blob);
+          
+          variants.push({
+            id: Math.random().toString(36).substr(2, 9),
+            url: url,
+            filename: `${file.name.split('.')[0]}_variant_${i + 1}_fallback.${file.name.split('.').pop()}`,
+            parameters: { ...parameters },
+            originalFile: file
+          });
+        }
+      }
       
       const result: ProcessedResult = {
         id: Math.random().toString(36).substr(2, 9),
         originalFilename: file.name,
-        variants: Array.from({ length: variations }, (_, i) => {
-          // Create a blob URL for each variant using the original file
-          const blob = new Blob([file], { type: file.type });
-          const url = URL.createObjectURL(blob);
-          
-          return {
-            id: Math.random().toString(36).substr(2, 9),
-            url: url,
-            filename: `${file.name.split('.')[0]}_variant_${i + 1}.mp4`,
-            parameters: { /* processed parameters */ },
-            originalFile: file // Store reference to original file for downloads
-          };
-        }),
+        variants: variants,
         timestamp: new Date()
       };
       
