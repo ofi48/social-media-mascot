@@ -149,6 +149,49 @@ export const ProcessVideoTab = () => {
                 </div>
               </div>
             )}
+            
+            {/* Large Process Button */}
+            {processingMode === 'single' && (
+              <div className="mt-6 space-y-4">
+                <Button 
+                  variant="hero" 
+                  size="lg"
+                  className="w-full h-12 text-lg font-semibold"
+                  onClick={handleProcessVideo}
+                  disabled={selectedFiles.length === 0 || getEnabledParametersCount() === 0 || isProcessing}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Settings className="mr-2 h-5 w-5 animate-spin" />
+                      Processing {variations} Variations...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-5 w-5" />
+                      Process Video - Create {variations} Variations
+                    </>
+                  )}
+                </Button>
+                
+                {selectedFiles.length === 0 && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Upload a video file to enable processing
+                  </p>
+                )}
+                
+                {selectedFiles.length > 0 && getEnabledParametersCount() === 0 && (
+                  <p className="text-xs text-center text-destructive">
+                    Enable at least one processing parameter to start
+                  </p>
+                )}
+                
+                {selectedFiles.length > 0 && getEnabledParametersCount() > 0 && !isProcessing && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Ready to process with {getEnabledParametersCount()} parameters enabled
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -224,39 +267,7 @@ export const ProcessVideoTab = () => {
           </Card>
         )}
 
-        {/* Start Processing Button for Single Mode */}
-        {processingMode === 'single' && selectedFiles.length > 0 && !isProcessing && (
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Ready to Process</CardTitle>
-              <CardDescription>
-                Start processing your video with current parameters
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-center space-y-2">
-                  <div className="text-sm text-muted-foreground">
-                    Will create <span className="font-semibold text-foreground">{variations}</span> variations
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Using <span className="font-semibold text-foreground">{getEnabledParametersCount()}</span> parameters
-                  </div>
-                </div>
-                
-                <Button 
-                  variant="hero" 
-                  className="w-full" 
-                  onClick={handleProcessVideo}
-                  disabled={getEnabledParametersCount() === 0}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Processing
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Start Processing Button for Single Mode - REMOVED since it's now below upload */}
 
         {/* Parameters */}
         <Card className="lg:col-span-2">
