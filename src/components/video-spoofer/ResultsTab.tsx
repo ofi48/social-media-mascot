@@ -13,10 +13,10 @@ export const ResultsTab = () => {
 
   const handleDownload = (variant: any, originalFile?: File) => {
     try {
-      // Use the original file if available, otherwise create a mock download
-      const file = originalFile || variant.originalFile;
-      if (file) {
-        const blob = new Blob([file], { type: file.type });
+      // Use the processed blob if available, otherwise fall back to original file
+      const blob = variant.blob || (originalFile ? new Blob([originalFile], { type: originalFile.type }) : null);
+      
+      if (blob) {
         const url = URL.createObjectURL(blob);
         
         const link = document.createElement('a');
@@ -31,8 +31,8 @@ export const ResultsTab = () => {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         toast.success(`Downloading ${variant.filename}...`);
       } else {
-        // Fallback for cases where original file is not available
-        toast.error("Original file not available for download");
+        // Fallback for cases where no file is available
+        toast.error("Processed file not available for download");
       }
     } catch (error) {
       toast.error(`Failed to download ${variant.filename}`);

@@ -50,6 +50,7 @@ export interface ProcessingParameters {
 export interface ProcessingJob {
   id: string;
   filename: string;
+  file: File;
   status: 'waiting' | 'processing' | 'completed' | 'error';
   progress: number;
   errorMessage?: string;
@@ -57,15 +58,17 @@ export interface ProcessingJob {
   uploadProgress?: number;
 }
 
+export interface VideoVariant {
+  id: string;
+  filename: string;
+  blob: Blob;
+  originalFile: File;
+}
+
 export interface ProcessedResult {
   id: string;
   originalFilename: string;
-  variants: {
-    id: string;
-    url: string;
-    filename: string;
-    parameters: any;
-  }[];
+  variants: VideoVariant[];
   timestamp: Date;
 }
 
@@ -169,6 +172,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
     const newJobs = files.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       filename: file.name,
+      file: file,
       status: 'waiting' as const,
       progress: 0
     }));
@@ -460,17 +464,77 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
   const processBatch = async (variations: number) => {
     setIsProcessing(true);
     try {
-      for (const job of queue.filter(j => j.status === 'waiting')) {
+      const waitingJobs = queue.filter(j => j.status === 'waiting');
+      
+      for (const job of waitingJobs) {
+        // Update job status to processing
         setQueue(prev => prev.map(j => 
-          j.id === job.id ? { ...j, status: 'processing' } : j
+          j.id === job.id ? { ...j, status: 'processing', progress: 0 } : j
         ));
         
-        // Simulate processing
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        setQueue(prev => prev.map(j => 
-          j.id === job.id ? { ...j, status: 'completed', progress: 100 } : j
-        ));
+        try {
+          // Process the actual video file
+          const variants: VideoVariant[] = [];
+          
+          for (let i = 0; i < variations; i++) {
+            try {
+              // Update progress for this variation
+              const progressPercent = Math.round(((i + 1) / variations) * 100);
+              setQueue(prev => prev.map(j => 
+                j.id === job.id ? { ...j, progress: progressPercent } : j
+              ));
+              
+              const processedBlob = await applyVideoProcessing(job.file, parameters);
+              const variant: VideoVariant = {
+                id: `${job.id}-var-${i + 1}`,
+                filename: `${job.filename.replace(/\.[^/.]+$/, '')}_variation_${i + 1}.mp4`,
+                blob: processedBlob,
+                originalFile: job.file
+              };
+              variants.push(variant);
+            } catch (error) {
+              console.error(`Error processing variation ${i + 1} for ${job.filename}:`, error);
+              // Continue with other variations even if one fails
+            }
+          }
+          
+          // Create result and add to results
+          if (variants.length > 0) {
+            const result: ProcessedResult = {
+              id: job.id,
+              originalFilename: job.filename,
+              variants: variants,
+              timestamp: new Date()
+            };
+            addResult(result);
+            
+            // Mark job as completed
+            setQueue(prev => prev.map(j => 
+              j.id === job.id ? { ...j, status: 'completed', progress: 100 } : j
+            ));
+          } else {
+            // Mark job as error if no variants were created
+            setQueue(prev => prev.map(j => 
+              j.id === job.id ? { 
+                ...j, 
+                status: 'error', 
+                progress: 0, 
+                errorMessage: 'Failed to process any variations' 
+              } : j
+            ));
+          }
+          
+        } catch (error) {
+          console.error(`Error processing ${job.filename}:`, error);
+          setQueue(prev => prev.map(j => 
+            j.id === job.id ? { 
+              ...j, 
+              status: 'error', 
+              progress: 0, 
+              errorMessage: error instanceof Error ? error.message : 'Processing failed' 
+            } : j
+          ));
+        }
       }
     } finally {
       setIsProcessing(false);
