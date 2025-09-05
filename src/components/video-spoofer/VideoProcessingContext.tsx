@@ -106,6 +106,10 @@ interface VideoProcessingContextType {
   clearResults: () => void;
   downloadAllResults: () => void;
   
+  // Configuration Export/Import
+  exportConfiguration: () => void;
+  importConfiguration: (file: File) => Promise<void>;
+  
   // Presets
   presets: Preset[];
   savePreset: (name: string) => void;
@@ -613,6 +617,58 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
     });
   };
 
+  const exportConfiguration = () => {
+    const config = {
+      parameters,
+      exportDate: new Date().toISOString(),
+      version: "1.0"
+    };
+    
+    const dataStr = JSON.stringify(config, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `video-spoofer-config-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    URL.revokeObjectURL(url);
+  };
+
+  const importConfiguration = async (file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const result = e.target?.result as string;
+          const config = JSON.parse(result);
+          
+          // Validate the configuration structure
+          if (config.parameters && typeof config.parameters === 'object') {
+            // Merge with default parameters to ensure all required fields exist
+            const mergedParams = { ...parameters, ...config.parameters };
+            setParameters(mergedParams);
+            resolve();
+          } else {
+            reject(new Error('Invalid configuration file format'));
+          }
+        } catch (error) {
+          reject(new Error('Failed to parse configuration file'));
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Failed to read configuration file'));
+      };
+      
+      reader.readAsText(file);
+    });
+  };
+
   return (
     <VideoProcessingContext.Provider value={{
       parameters,
@@ -631,6 +687,8 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       addResult,
       clearResults,
       downloadAllResults,
+      exportConfiguration,
+      importConfiguration,
       presets,
       savePreset,
       loadPreset,

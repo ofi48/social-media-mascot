@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Download, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { useVideoProcessing } from "./VideoProcessingContext";
 
 interface RangeInputProps {
@@ -76,14 +78,67 @@ const RangeInput = ({
 };
 
 export const ProcessingParameters = () => {
-  const { parameters, updateParameter } = useVideoProcessing();
+  const { parameters, updateParameter, exportConfiguration, importConfiguration } = useVideoProcessing();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateRangeParameter = (key: string, value: { min: number; max: number; enabled: boolean }) => {
     updateParameter(key, value);
   };
 
+  const handleExportConfig = () => {
+    exportConfiguration();
+    toast.success("Configuration exported successfully!");
+  };
+
+  const handleImportConfig = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        await importConfiguration(file);
+        toast.success("Configuration imported successfully!");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to import configuration");
+      }
+      // Reset the input
+      event.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Configuration Export/Import */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Configuration Management</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExportConfig}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Configuration
+            </Button>
+            <Button variant="outline" onClick={handleImportConfig}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import Configuration
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Save your processing parameters to a file or load a previously saved configuration.
+          </p>
+        </CardContent>
+      </Card>
+
       <Accordion type="multiple" defaultValue={["quality", "color", "effects"]} className="w-full">
         {/* Video Quality Controls */}
         <AccordionItem value="quality">
