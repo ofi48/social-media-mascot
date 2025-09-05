@@ -8,7 +8,7 @@ import { useVideoProcessing } from "./VideoProcessingContext";
 import { toast } from "sonner";
 
 export const ResultsTab = () => {
-  const { results, clearResults } = useVideoProcessing();
+  const { results, clearResults, downloadAllResults } = useVideoProcessing();
   const [selectedResult, setSelectedResult] = useState<any>(null);
 
   const handleDownload = (variant: any, originalFile?: File) => {
@@ -48,6 +48,17 @@ export const ResultsTab = () => {
         handleDownload(variant);
       }, index * 500); // Stagger downloads to avoid browser blocking
     });
+  };
+
+  const handleDownloadAllResults = () => {
+    if (results.length === 0) {
+      toast.error("No processed videos to download");
+      return;
+    }
+    
+    const totalVariations = results.reduce((sum, result) => sum + result.variants.length, 0);
+    toast.success(`Starting download of ${totalVariations} video variations...`);
+    downloadAllResults();
   };
 
   const handlePreview = (variant: any) => {
@@ -114,6 +125,21 @@ export const ResultsTab = () => {
               <div className="text-sm text-muted-foreground">Est. Total Size</div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Download All Button */}
+      {results.length > 0 && (
+        <div className="flex justify-center">
+          <Button
+            variant="hero"
+            size="lg"
+            onClick={handleDownloadAllResults}
+            className="px-8"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download All Variations ({results.reduce((sum, result) => sum + result.variants.length, 0)})
+          </Button>
         </div>
       )}
 

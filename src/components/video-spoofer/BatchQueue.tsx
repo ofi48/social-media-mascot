@@ -19,9 +19,7 @@ export const BatchQueue = ({ variations, setVariations }: BatchQueueProps) => {
     clearQueue, 
     retryJob, 
     processBatch, 
-    isProcessing,
-    results,
-    downloadAllResults
+    isProcessing
   } = useVideoProcessing();
 
   const handleStartBatch = async () => {
@@ -33,17 +31,6 @@ export const BatchQueue = ({ variations, setVariations }: BatchQueueProps) => {
     toast.success("Starting batch processing...");
     await processBatch(variations);
     toast.success("Batch processing completed!");
-  };
-
-  const handleDownloadAll = () => {
-    if (results.length === 0) {
-      toast.error("No processed videos to download");
-      return;
-    }
-    
-    const totalVariations = results.reduce((sum, result) => sum + result.variants.length, 0);
-    toast.success(`Starting download of ${totalVariations} video variations...`);
-    downloadAllResults();
   };
 
   const getStatusColor = (status: string) => {
@@ -87,17 +74,6 @@ export const BatchQueue = ({ variations, setVariations }: BatchQueueProps) => {
         </div>
         
         <div className="flex items-center gap-2">
-          {results.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadAll}
-              disabled={isProcessing}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download All ({results.reduce((sum, result) => sum + result.variants.length, 0)})
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
