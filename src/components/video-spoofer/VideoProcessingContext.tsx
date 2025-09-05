@@ -264,16 +264,27 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         
         video.onseeked = () => {
           try {
-            // Set up MediaRecorder with fallback codec
+            // Set up MediaRecorder with MP4 preference
             let mediaRecorder;
+            let outputMimeType = 'video/mp4';
             const stream = canvas.captureStream(25);
             
-            if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+            // Try MP4 first, then fallback to WebM
+            if (MediaRecorder.isTypeSupported('video/mp4')) {
+              mediaRecorder = new MediaRecorder(stream, { 
+                mimeType: 'video/mp4',
+                videoBitsPerSecond: 2500000 // 2.5 Mbps for better quality
+              });
+              outputMimeType = 'video/mp4';
+            } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
               mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+              outputMimeType = 'video/webm';
             } else if (MediaRecorder.isTypeSupported('video/webm')) {
               mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+              outputMimeType = 'video/webm';
             } else {
               mediaRecorder = new MediaRecorder(stream);
+              outputMimeType = 'video/webm';
             }
             
             const chunks: Blob[] = [];
@@ -287,7 +298,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             };
             
             mediaRecorder.onstop = () => {
-              const processedBlob = new Blob(chunks, { type: 'video/webm' });
+              const processedBlob = new Blob(chunks, { type: outputMimeType });
               URL.revokeObjectURL(videoUrl);
               resolve(processedBlob);
             };
@@ -435,7 +446,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
           const processedBlob = await applyVideoProcessing(file, parameters);
           variants.push({
             id: Math.random().toString(36).substr(2, 9),
-            filename: `${file.name.split('.')[0]}_variant_${i + 1}.webm`,
+            filename: `${file.name.split('.')[0]}_variant_${i + 1}.mp4`,
             blob: processedBlob,
             originalFile: file
           });
