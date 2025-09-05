@@ -433,26 +433,21 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       for (let i = 0; i < variations; i++) {
         try {
           const processedBlob = await applyVideoProcessing(file, parameters);
-          const url = URL.createObjectURL(processedBlob);
-          
           variants.push({
             id: Math.random().toString(36).substr(2, 9),
-            url: url,
             filename: `${file.name.split('.')[0]}_variant_${i + 1}.webm`,
-            parameters: { ...parameters },
-            originalFile: processedBlob
+            blob: processedBlob,
+            originalFile: file
           });
         } catch (error) {
           console.error(`Error processing variant ${i + 1}:`, error);
           // Create fallback variant with original file
           const blob = new Blob([file], { type: file.type });
-          const url = URL.createObjectURL(blob);
           
           variants.push({
             id: Math.random().toString(36).substr(2, 9),
-            url: url,
             filename: `${file.name.split('.')[0]}_variant_${i + 1}_fallback.${file.name.split('.').pop()}`,
-            parameters: { ...parameters },
+            blob: blob,
             originalFile: file
           });
         } finally {
