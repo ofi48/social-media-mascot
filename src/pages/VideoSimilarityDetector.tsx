@@ -1,17 +1,17 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SimilarityProvider } from "@/components/similarity-detector/SimilarityContext";
-import FileUploadSection from "@/components/similarity-detector/FileUploadSection";
-import ResultsSection from "@/components/similarity-detector/ResultsSection";
+import { SimilarityProvider } from "@/components/video-similarity/SimilarityContext";
+import FileUploadSection from "@/components/video-similarity/FileUploadSection";
+import ResultsSection from "@/components/video-similarity/ResultsSection";
 
-const SimilarityDetector = () => {
+const VideoSimilarityDetector = () => {
   return (
     <SimilarityProvider>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Visual Similarity Detector</h1>
+            <h1 className="text-3xl font-bold text-foreground">Video Similarity Detector</h1>
             <p className="text-muted-foreground mt-1">
-              Advanced visual comparison using multiple computer vision algorithms
+              Advanced video comparison using multiple computer vision algorithms
             </p>
           </div>
         </div>
@@ -35,4 +35,4 @@ const SimilarityDetector = () => {
   );
 };
 
-export default SimilarityDetector;
+export default VideoSimilarityDetector;

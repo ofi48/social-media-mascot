@@ -5,7 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DashboardLayout } from "./components/DashboardLayout";
 import VideoSpoofer from "./pages/VideoSpoofer";
-import SimilarityDetector from "./pages/SimilarityDetector";
+import VideoSimilarityDetector from "./pages/VideoSimilarityDetector";
+import ImageSimilarityDetector from "./pages/ImageSimilarityDetector";
 import ImageSpoofer from "./pages/ImageSpoofer";
 import NotFound from "./pages/NotFound";
 
@@ -21,7 +22,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/video-spoofer" replace />} />
             <Route path="/video-spoofer" element={<VideoSpoofer />} />
-            <Route path="/similarity-detector" element={<SimilarityDetector />} />
+            <Route path="/video-similarity" element={<VideoSimilarityDetector />} />
+            <Route path="/image-similarity" element={<ImageSimilarityDetector />} />
             <Route path="/image-spoofer" element={<ImageSpoofer />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
