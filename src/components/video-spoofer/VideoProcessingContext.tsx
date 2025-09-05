@@ -233,8 +233,22 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
         
         // Set canvas dimensions based on parameters
-        canvas.width = params.customPixelSize.enabled ? params.customPixelSize.width : video.videoWidth;
-        canvas.height = params.customPixelSize.enabled ? params.customPixelSize.height : video.videoHeight;
+        let canvasWidth = video.videoWidth;
+        let canvasHeight = video.videoHeight;
+        
+        if (params.customPixelSize.enabled) {
+          canvasWidth = params.customPixelSize.width;
+          canvasHeight = params.customPixelSize.height;
+        } else if (params.randomPixelSize) {
+          // Random 9:16 aspect ratio sizes
+          const heights = [720, 1080, 1280, 1440];
+          const randomHeight = heights[Math.floor(Math.random() * heights.length)];
+          canvasHeight = randomHeight;
+          canvasWidth = Math.round(randomHeight * (9/16));
+        }
+        
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
         
         // Calculate trim timing with validation
         let startTime = 0;
@@ -269,16 +283,22 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         
         video.onseeked = () => {
           try {
-            // Set up MediaRecorder with MP4 preference
+            // Set up MediaRecorder with MP4 preference and dynamic bitrate
             let mediaRecorder;
             let outputMimeType = 'video/mp4';
             const stream = canvas.captureStream(25);
+            
+            // Calculate bitrate if enabled
+            let videoBitrate = 2500000; // Default 2.5 Mbps
+            if (params.videoBitrate.enabled) {
+              videoBitrate = (Math.random() * (params.videoBitrate.max - params.videoBitrate.min) + params.videoBitrate.min) * 1000; // Convert to bps
+            }
             
             // Try MP4 first, then fallback to WebM
             if (MediaRecorder.isTypeSupported('video/mp4')) {
               mediaRecorder = new MediaRecorder(stream, { 
                 mimeType: 'video/mp4',
-                videoBitsPerSecond: 2500000 // 2.5 Mbps for better quality
+                videoBitsPerSecond: videoBitrate
               });
               outputMimeType = 'video/mp4';
             } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
@@ -360,8 +380,9 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               
               ctx.restore();
               
-              // Apply post-processing effects (simplified)
-              if (params.brightness.enabled || params.contrast.enabled || params.noise.enabled) {
+              // Apply post-processing effects
+              if (params.brightness.enabled || params.contrast.enabled || params.noise.enabled || 
+                  params.saturation.enabled || params.gamma.enabled || params.vignette.enabled) {
                 try {
                   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                   const data = imageData.data;
@@ -372,28 +393,107 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
                     Math.random() * (params.contrast.max - params.contrast.min) + params.contrast.min : 1;
                   const noiseLevel = params.noise.enabled ? 
                     Math.random() * (params.noise.max - params.noise.min) + params.noise.min : 0;
+                  const saturation = params.saturation.enabled ?
+                    Math.random() * (params.saturation.max - params.saturation.min) + params.saturation.min : 1;
+                  const gamma = params.gamma.enabled ?
+                    Math.random() * (params.gamma.max - params.gamma.min) + params.gamma.min : 1;
+                  const vignetteStrength = params.vignette.enabled ?
+                    Math.random() * (params.vignette.max - params.vignette.min) + params.vignette.min : 0;
                   
                   for (let i = 0; i < data.length; i += 4) {
+                    let r = data[i];
+                    let g = data[i + 1];
+                    let b = data[i + 2];
+                    
                     // Apply brightness and contrast
                     if (params.brightness.enabled || params.contrast.enabled) {
-                      data[i] = Math.max(0, Math.min(255, (data[i] - 128) * contrast + 128 + brightness * 255));
-                      data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - 128) * contrast + 128 + brightness * 255));
-                      data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - 128) * contrast + 128 + brightness * 255));
+                      r = Math.max(0, Math.min(255, (r - 128) * contrast + 128 + brightness * 255));
+                      g = Math.max(0, Math.min(255, (g - 128) * contrast + 128 + brightness * 255));
+                      b = Math.max(0, Math.min(255, (b - 128) * contrast + 128 + brightness * 255));
+                    }
+                    
+                    // Apply saturation
+                    if (params.saturation.enabled) {
+                      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                      r = gray + saturation * (r - gray);
+                      g = gray + saturation * (g - gray);
+                      b = gray + saturation * (b - gray);
+                      r = Math.max(0, Math.min(255, r));
+                      g = Math.max(0, Math.min(255, g));
+                      b = Math.max(0, Math.min(255, b));
+                    }
+                    
+                    // Apply gamma correction
+                    if (params.gamma.enabled) {
+                      r = Math.pow(r / 255, gamma) * 255;
+                      g = Math.pow(g / 255, gamma) * 255;
+                      b = Math.pow(b / 255, gamma) * 255;
+                    }
+                    
+                    // Apply vignette effect
+                    if (params.vignette.enabled) {
+                      const x = (i / 4) % canvas.width;
+                      const y = Math.floor((i / 4) / canvas.width);
+                      const centerX = canvas.width / 2;
+                      const centerY = canvas.height / 2;
+                      const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+                      const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
+                      const vignette = 1 - (distance / maxDistance) * vignetteStrength;
+                      r *= vignette;
+                      g *= vignette;
+                      b *= vignette;
                     }
                     
                     // Apply noise
                     if (params.noise.enabled) {
                       const noise = (Math.random() - 0.5) * noiseLevel * 255;
-                      data[i] = Math.max(0, Math.min(255, data[i] + noise));
-                      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-                      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+                      r = Math.max(0, Math.min(255, r + noise));
+                      g = Math.max(0, Math.min(255, g + noise));
+                      b = Math.max(0, Math.min(255, b + noise));
                     }
+                    
+                    // Apply pixel shift effects
+                    if (params.pixelShift.enabled) {
+                      const shiftAmount = Math.random() * (params.pixelShift.max - params.pixelShift.min) + params.pixelShift.min;
+                      const shift = Math.floor(shiftAmount);
+                      if (shift > 0 && i + shift * 4 < data.length) {
+                        r = data[i + shift * 4];
+                        g = data[i + shift * 4 + 1];
+                        b = data[i + shift * 4 + 2];
+                      }
+                    }
+                    
+                    data[i] = r;
+                    data[i + 1] = g;
+                    data[i + 2] = b;
                   }
                   
                   ctx.putImageData(imageData, 0, 0);
                 } catch (error) {
                   console.warn('Error applying post-processing effects:', error);
                 }
+              }
+              
+              // Apply blurred border effect
+              if (params.blurredBorder.enabled) {
+                const borderSize = Math.random() * (params.blurredBorder.max - params.blurredBorder.min) + params.blurredBorder.min;
+                ctx.filter = `blur(${borderSize}px)`;
+                ctx.strokeStyle = 'transparent';
+                ctx.lineWidth = borderSize;
+                ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                ctx.filter = 'none';
+              }
+              
+              // Apply watermark if enabled
+              if (params.watermark.enabled) {
+                ctx.globalAlpha = params.watermark.opacity;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.font = `${params.watermark.size}px Arial`;
+                const text = params.usMetadata ? 'US_META_' + Date.now() : 'WATERMARK';
+                const x = canvas.width * params.watermark.positionX;
+                const y = canvas.height * params.watermark.positionY;
+                ctx.fillText(text, x, y);
+                ctx.globalAlpha = 1;
               }
               
               // Advance to next frame
@@ -432,11 +532,11 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         reject(new Error('Error loading video'));
       };
       
-      // Add timeout to prevent infinite hanging - increased for larger videos
+      // Add timeout to prevent infinite hanging - increased to 60 seconds
       setTimeout(() => {
         URL.revokeObjectURL(videoUrl);
         reject(new Error('Video processing timeout'));
-      }, 30000); // 30 second timeout for better reliability
+      }, 60000); // 60 second timeout for better reliability
     });
   };
 
