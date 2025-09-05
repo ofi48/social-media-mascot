@@ -104,6 +104,7 @@ interface VideoProcessingContextType {
   results: ProcessedResult[];
   addResult: (result: ProcessedResult) => void;
   clearResults: () => void;
+  downloadAllResults: () => void;
   
   // Presets
   presets: Preset[];
@@ -588,6 +589,30 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
     setPresets(prev => prev.filter(p => p.id !== id));
   };
 
+  const downloadAllResults = () => {
+    if (results.length === 0) {
+      console.warn('No results to download');
+      return;
+    }
+
+    results.forEach((result, resultIndex) => {
+      result.variants.forEach((variant, variantIndex) => {
+        if (variant.blob) {
+          setTimeout(() => {
+            const url = URL.createObjectURL(variant.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = variant.filename || `processed_video_${resultIndex + 1}_${variantIndex + 1}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, (resultIndex * result.variants.length + variantIndex) * 500); // Stagger downloads
+        }
+      });
+    });
+  };
+
   return (
     <VideoProcessingContext.Provider value={{
       parameters,
@@ -605,6 +630,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       results,
       addResult,
       clearResults,
+      downloadAllResults,
       presets,
       savePreset,
       loadPreset,
