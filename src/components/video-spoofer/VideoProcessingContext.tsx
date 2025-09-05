@@ -204,6 +204,20 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
       video.src = videoUrl;
       
       video.onloadedmetadata = () => {
+        console.log(`Video loaded: ${video.duration}s, ${video.videoWidth}x${video.videoHeight}`);
+        
+        // Validate video before processing
+        if (video.duration === 0 || isNaN(video.duration)) {
+          URL.revokeObjectURL(videoUrl);
+          reject(new Error('Invalid video file or corrupted video'));
+          return;
+        }
+        
+        // Set reasonable limits for processing
+        const maxDuration = 60; // 60 seconds max
+        if (video.duration > maxDuration) {
+          console.warn(`Video too long (${video.duration}s), trimming to ${maxDuration}s`);
+        }
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
@@ -375,12 +389,13 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               if (video.currentTime < endTime && frameCount < maxFrames) {
                 requestAnimationFrame(renderFrame);
               } else {
-                // Ensure MediaRecorder stops
+                // Ensure MediaRecorder stops properly
                 setTimeout(() => {
                   if (mediaRecorder.state === 'recording') {
+                    console.log('Stopping MediaRecorder after completion');
                     mediaRecorder.stop();
                   }
-                }, 100);
+                }, 200); // Increased delay for stability
               }
             };
             
@@ -401,11 +416,11 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         reject(new Error('Error loading video'));
       };
       
-      // Add timeout to prevent infinite hanging
+      // Add timeout to prevent infinite hanging - increased for larger videos
       setTimeout(() => {
         URL.revokeObjectURL(videoUrl);
         reject(new Error('Video processing timeout'));
-      }, 12000); // 12 second timeout
+      }, 30000); // 30 second timeout for better reliability
     });
   };
 
