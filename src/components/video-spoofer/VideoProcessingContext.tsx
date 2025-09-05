@@ -3,8 +3,6 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 export interface ProcessingParameters {
   // Video Quality Controls
   videoBitrate: { min: number; max: number; enabled: boolean };
-  audioBitrate: { min: number; max: number; enabled: boolean };
-  frameRate: { min: number; max: number; enabled: boolean };
   
   // Color Adjustment Engine
   saturation: { min: number; max: number; enabled: boolean };
@@ -15,7 +13,6 @@ export interface ProcessingParameters {
   // Visual Effects Processing
   vignette: { min: number; max: number; enabled: boolean };
   noise: { min: number; max: number; enabled: boolean };
-  waveformShift: { min: number; max: number; enabled: boolean };
   pixelShift: { min: number; max: number; enabled: boolean };
   
   // Transformation Controls
@@ -29,9 +26,6 @@ export interface ProcessingParameters {
   randomPixelSize: boolean;
   trimStart: { min: number; max: number; enabled: boolean };
   trimEnd: { min: number; max: number; enabled: boolean };
-  
-  // Audio Processing
-  volume: { min: number; max: number; enabled: boolean };
   
   // Special Features
   usMetadata: boolean;
@@ -125,15 +119,12 @@ interface VideoProcessingContextType {
 
 const defaultParameters: ProcessingParameters = {
   videoBitrate: { min: 1000, max: 15000, enabled: false },
-  audioBitrate: { min: 64, max: 320, enabled: false },
-  frameRate: { min: 24, max: 60, enabled: false },
   saturation: { min: 0.5, max: 1.5, enabled: false },
   contrast: { min: 0.5, max: 1.5, enabled: false },
   brightness: { min: -0.3, max: 0.3, enabled: false },
   gamma: { min: 0.7, max: 1.3, enabled: false },
   vignette: { min: 0, max: 0.8, enabled: false },
   noise: { min: 0, max: 0.1, enabled: false },
-  waveformShift: { min: 0, max: 5, enabled: false },
   pixelShift: { min: 0, max: 5, enabled: false },
   speed: { min: 0.5, max: 2.0, enabled: false },
   zoom: { min: 0.9, max: 1.2, enabled: false },
@@ -143,7 +134,6 @@ const defaultParameters: ProcessingParameters = {
   randomPixelSize: false,
   trimStart: { min: 0, max: 10, enabled: false },
   trimEnd: { min: 0, max: 10, enabled: false },
-  volume: { min: 0.5, max: 1.5, enabled: false },
   usMetadata: false,
   blurredBorder: { min: 0, max: 100, enabled: false },
   watermark: {

@@ -146,7 +146,7 @@ export const ProcessingParameters = () => {
             <div className="flex items-center gap-2">
               Video Quality Controls
               <Badge variant="outline" className="text-xs">
-                {[parameters.videoBitrate.enabled, parameters.audioBitrate.enabled, parameters.frameRate.enabled].filter(Boolean).length} enabled
+                {[parameters.videoBitrate.enabled].filter(Boolean).length} enabled
               </Badge>
             </div>
           </AccordionTrigger>
@@ -162,28 +162,6 @@ export const ProcessingParameters = () => {
                 onChange={(value) => updateRangeParameter('videoBitrate', { ...value, enabled: parameters.videoBitrate.enabled })}
                 onEnabledChange={(enabled) => updateRangeParameter('videoBitrate', { ...parameters.videoBitrate, enabled })}
                 unit=" kbps"
-              />
-              <RangeInput
-                label="Audio Bitrate"
-                min={64}
-                max={320}
-                step={16}
-                enabled={parameters.audioBitrate.enabled}
-                value={{ min: parameters.audioBitrate.min, max: parameters.audioBitrate.max }}
-                onChange={(value) => updateRangeParameter('audioBitrate', { ...value, enabled: parameters.audioBitrate.enabled })}
-                onEnabledChange={(enabled) => updateRangeParameter('audioBitrate', { ...parameters.audioBitrate, enabled })}
-                unit=" kbps"
-              />
-              <RangeInput
-                label="Frame Rate"
-                min={24}
-                max={60}
-                step={1}
-                enabled={parameters.frameRate.enabled}
-                value={{ min: parameters.frameRate.min, max: parameters.frameRate.max }}
-                onChange={(value) => updateRangeParameter('frameRate', { ...value, enabled: parameters.frameRate.enabled })}
-                onEnabledChange={(enabled) => updateRangeParameter('frameRate', { ...parameters.frameRate, enabled })}
-                unit=" fps"
               />
             </div>
           </AccordionContent>
@@ -256,7 +234,6 @@ export const ProcessingParameters = () => {
                 {[
                   parameters.vignette.enabled, 
                   parameters.noise.enabled, 
-                  parameters.waveformShift.enabled, 
                   parameters.pixelShift.enabled,
                   parameters.speed.enabled,
                   parameters.zoom.enabled,
@@ -287,6 +264,17 @@ export const ProcessingParameters = () => {
                 value={{ min: parameters.noise.min, max: parameters.noise.max }}
                 onChange={(value) => updateRangeParameter('noise', { ...value, enabled: parameters.noise.enabled })}
                 onEnabledChange={(enabled) => updateRangeParameter('noise', { ...parameters.noise, enabled })}
+              />
+              <RangeInput
+                label="Pixel Shift"
+                min={0}
+                max={5}
+                step={1}
+                enabled={parameters.pixelShift.enabled}
+                value={{ min: parameters.pixelShift.min, max: parameters.pixelShift.max }}
+                onChange={(value) => updateRangeParameter('pixelShift', { ...value, enabled: parameters.pixelShift.enabled })}
+                onEnabledChange={(enabled) => updateRangeParameter('pixelShift', { ...parameters.pixelShift, enabled })}
+                unit=" px"
               />
               <RangeInput
                 label="Speed"
@@ -343,7 +331,6 @@ export const ProcessingParameters = () => {
               Additional Options
               <Badge variant="outline" className="text-xs">
                 {[
-                  parameters.volume.enabled,
                   parameters.trimStart.enabled,
                   parameters.trimEnd.enabled,
                   parameters.blurredBorder.enabled,
@@ -356,17 +343,6 @@ export const ProcessingParameters = () => {
           </AccordionTrigger>
           <AccordionContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <RangeInput
-                label="Volume"
-                min={0.5}
-                max={1.5}
-                step={0.1}
-                enabled={parameters.volume.enabled}
-                value={{ min: parameters.volume.min, max: parameters.volume.max }}
-                onChange={(value) => updateRangeParameter('volume', { ...value, enabled: parameters.volume.enabled })}
-                onEnabledChange={(enabled) => updateRangeParameter('volume', { ...parameters.volume, enabled })}
-                unit="x"
-              />
               <RangeInput
                 label="Trim Start"
                 min={0}
@@ -388,6 +364,17 @@ export const ProcessingParameters = () => {
                 onChange={(value) => updateRangeParameter('trimEnd', { ...value, enabled: parameters.trimEnd.enabled })}
                 onEnabledChange={(enabled) => updateRangeParameter('trimEnd', { ...parameters.trimEnd, enabled })}
                 unit="s"
+              />
+              <RangeInput
+                label="Blurred Border"
+                min={0}
+                max={100}
+                step={5}
+                enabled={parameters.blurredBorder.enabled}
+                value={{ min: parameters.blurredBorder.min, max: parameters.blurredBorder.max }}
+                onChange={(value) => updateRangeParameter('blurredBorder', { ...value, enabled: parameters.blurredBorder.enabled })}
+                onEnabledChange={(enabled) => updateRangeParameter('blurredBorder', { ...parameters.blurredBorder, enabled })}
+                unit="px"
               />
               
               {/* Toggle Options */}
