@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProcessVideoTab } from "@/components/video-spoofer/ProcessVideoTab";
-import { ManagePresetsTab } from "@/components/video-spoofer/ManagePresetsTab";
 import { ResultsTab } from "@/components/video-spoofer/ResultsTab";
 import { VideoProcessingProvider } from "@/components/video-spoofer/VideoProcessingContext";
 
@@ -21,12 +20,9 @@ const VideoSpoofer = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="process" className="flex items-center gap-2">
               Process Video
-            </TabsTrigger>
-            <TabsTrigger value="presets" className="flex items-center gap-2">
-              Manage Presets
             </TabsTrigger>
             <TabsTrigger value="results" className="flex items-center gap-2">
               Results
@@ -35,10 +31,6 @@ const VideoSpoofer = () => {
           
           <TabsContent value="process" className="mt-6">
             <ProcessVideoTab />
-          </TabsContent>
-          
-          <TabsContent value="presets" className="mt-6">
-            <ManagePresetsTab />
           </TabsContent>
           
           <TabsContent value="results" className="mt-6">
