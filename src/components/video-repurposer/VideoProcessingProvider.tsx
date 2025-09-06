@@ -30,6 +30,7 @@ export function VideoProcessingProvider({ children }: { children: React.ReactNod
   const [settings, setSettings] = useState<VideoPresetSettings>(DEFAULT_PRESET);
   const [processingMode, setProcessingMode] = useState<'single' | 'batch'>('single');
   
+  // Initialize hooks
   const singleProcessing = useVideoProcessing();
   const batchProcessing = useVideoQueue();
   const presetManager = usePresetManager();
