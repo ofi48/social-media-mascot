@@ -122,7 +122,7 @@ async function processVideoOnRailway(
     formData.append('requestId', requestId);
     
     // Send to Railway processing server
-    const railwayUrl = 'https://video-server-production-d7af.up.railway.app/process-video';
+    const railwayUrl = 'https://social-media-mascot-production.up.railway.app/process-video';
     
     console.log(`[${requestId}] Sending request to Railway: ${railwayUrl}`);
     
@@ -180,7 +180,10 @@ async function uploadProcessedVideos(
       console.log(`[${requestId}] Uploading processed video ${i + 1}/${railwayResults.length}: ${result.name}`);
       
       // Download the processed video from Railway
-      const videoResponse = await fetch(result.url);
+      const videoUrl = result.url.startsWith('/') 
+        ? `https://social-media-mascot-production.up.railway.app${result.url}`
+        : result.url;
+      const videoResponse = await fetch(videoUrl);
       if (!videoResponse.ok) {
         console.error(`[${requestId}] Failed to download processed video ${result.name}`);
         continue;
