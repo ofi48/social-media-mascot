@@ -3,50 +3,78 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProcessVideoTab } from "./ProcessVideoTab";
 import { ManagePresetsTab } from "./ManagePresetsTab";
 import { ResultsTab } from "./ResultsTab";
-import { VideoProcessingProvider } from "./VideoProcessingProvider";
+import { VideoProcessingProvider, useVideoProcessingContext } from "./VideoProcessingProvider";
 
-const VideoRepurposer = () => {
+const VideoRepurposerContent = () => {
   const [activeTab, setActiveTab] = useState("process");
+  const { singleProcessing, batchProcessing } = useVideoProcessingContext();
+
+  // Auto-switch to results tab when processing completes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+
+  // Switch to results tab when single processing completes successfully
+  if (singleProcessing.results.length > 0 && activeTab === "process") {
+    setTimeout(() => setActiveTab("results"), 500);
+  }
+
+  // Switch to results tab when batch processing has completed items
+  const completedBatchJobs = batchProcessing.queue.filter(job => job.status === 'completed');
+  if (completedBatchJobs.length > 0 && activeTab === "process") {
+    setTimeout(() => setActiveTab("results"), 500);
+  }
 
   return (
-    <VideoProcessingProvider>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">Video Spoofer</h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Genera múltiples variaciones únicas de tus videos con parámetros de procesamiento avanzados. 
-            Perfecto para creadores de contenido, especialistas en marketing y gestores de redes sociales.
-          </p>
-        </div>
-
-        {/* Main Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="process" className="flex items-center gap-2">
-              Procesar Video
-            </TabsTrigger>
-            <TabsTrigger value="presets" className="flex items-center gap-2">
-              Gestionar Presets
-            </TabsTrigger>
-            <TabsTrigger value="results" className="flex items-center gap-2">
-              Resultados
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="process" className="mt-6">
-            <ProcessVideoTab />
-          </TabsContent>
-          
-          <TabsContent value="presets" className="mt-6">
-            <ManagePresetsTab />
-          </TabsContent>
-          
-          <TabsContent value="results" className="mt-6">
-            <ResultsTab />
-          </TabsContent>
-        </Tabs>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <h1 className="text-4xl font-bold text-foreground">Video Spoofer</h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Genera múltiples variaciones únicas de tus videos con parámetros de procesamiento avanzados. 
+          Perfecto para creadores de contenido, especialistas en marketing y gestores de redes sociales.
+        </p>
       </div>
+
+      {/* Main Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="process" className="flex items-center gap-2">
+            Procesar Video
+          </TabsTrigger>
+          <TabsTrigger value="presets" className="flex items-center gap-2">
+            Gestionar Presets
+          </TabsTrigger>
+          <TabsTrigger value="results" className="flex items-center gap-2">
+            Resultados
+            {(singleProcessing.results.length > 0 || completedBatchJobs.length > 0) && (
+              <span className="ml-1 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+                {singleProcessing.results.length + completedBatchJobs.length}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="process" className="mt-6">
+          <ProcessVideoTab />
+        </TabsContent>
+        
+        <TabsContent value="presets" className="mt-6">
+          <ManagePresetsTab />
+        </TabsContent>
+        
+        <TabsContent value="results" className="mt-6">
+          <ResultsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+const VideoRepurposer = () => {
+  return (
+    <VideoProcessingProvider>
+      <VideoRepurposerContent />
     </VideoProcessingProvider>
   );
 };
