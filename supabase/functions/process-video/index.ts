@@ -1,0 +1,167 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+interface ProcessVideoRequest {
+  settings: any;
+  numCopies: number;
+}
+
+interface ProcessVideoResponse {
+  success: boolean;
+  results?: Array<{
+    name: string;
+    url: string;
+    processingDetails: any;
+  }>;
+  error?: string;
+}
+
+serve(async (req) => {
+  const requestId = crypto.randomUUID();
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    console.log(`[${requestId}] Processing video request started`);
+    
+    // Parse multipart form data
+    const formData = await req.formData();
+    const videoFile = formData.get('video') as File;
+    const settingsStr = formData.get('settings') as string;
+    const numCopiesStr = formData.get('numCopies') as string;
+    
+    if (!videoFile || !settingsStr || !numCopiesStr) {
+      throw new Error('Missing required fields: video, settings, or numCopies');
+    }
+    
+    // Validate file type
+    if (!videoFile.type.startsWith('video/')) {
+      throw new Error('Invalid file type. Only video files are allowed.');
+    }
+    
+    // Validate file size (100MB max)
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (videoFile.size > maxSize) {
+      throw new Error('File size exceeds 100MB limit');
+    }
+    
+    const settings = JSON.parse(settingsStr);
+    const numCopies = parseInt(numCopiesStr);
+    
+    console.log(`[${requestId}] Processing ${numCopies} variations of video: ${videoFile.name}`);
+    
+    // For now, simulate processing and return mock results
+    // In production, this would call your FFmpeg processing service
+    const results = await simulateVideoProcessing(videoFile, settings, numCopies, requestId);
+    
+    const response: ProcessVideoResponse = {
+      success: true,
+      results: results
+    };
+    
+    console.log(`[${requestId}] Processing completed successfully`);
+    
+    return new Response(
+      JSON.stringify(response),
+      {
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+    
+  } catch (error) {
+    console.error(`[${requestId}] Processing failed:`, error);
+    
+    const response: ProcessVideoResponse = {
+      success: false,
+      error: error.message || 'Unknown error occurred'
+    };
+    
+    return new Response(
+      JSON.stringify(response),
+      {
+        status: 500,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+  }
+})
+
+async function simulateVideoProcessing(
+  videoFile: File, 
+  settings: any, 
+  numCopies: number,
+  requestId: string
+): Promise<Array<{name: string, url: string, processingDetails: any}>> {
+  
+  // Simulate processing delay
+  await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+  
+  const results = [];
+  
+  for (let i = 0; i < numCopies; i++) {
+    // Generate mock processing details
+    const processingDetails = generateMockProcessingDetails(settings, i);
+    
+    // In production, this would be the actual processed video URL from your storage
+    const mockUrl = `https://example.com/processed-videos/${requestId}-variation-${i + 1}.mp4`;
+    
+    results.push({
+      name: `${videoFile.name.split('.')[0]}_variation_${i + 1}.mp4`,
+      url: mockUrl,
+      processingDetails: processingDetails
+    });
+    
+    console.log(`[${requestId}] Generated variation ${i + 1}/${numCopies}`);
+  }
+  
+  return results;
+}
+
+function generateMockProcessingDetails(settings: any, variationIndex: number): any {
+  const details: any = {};
+  
+  // Apply enabled settings with some variation
+  if (settings.videoBitrate?.enabled) {
+    details.videoBitrate = Math.floor(
+      settings.videoBitrate.min + 
+      (settings.videoBitrate.max - settings.videoBitrate.min) * 
+      Math.random()
+    );
+  }
+  
+  if (settings.saturation?.enabled) {
+    details.saturation = Number((
+      settings.saturation.min + 
+      (settings.saturation.max - settings.saturation.min) * 
+      Math.random()
+    ).toFixed(2));
+  }
+  
+  if (settings.speed?.enabled) {
+    details.speed = Number((
+      settings.speed.min + 
+      (settings.speed.max - settings.speed.min) * 
+      Math.random()
+    ).toFixed(2));
+  }
+  
+  // Add timestamp for tracking
+  details.processedAt = new Date().toISOString();
+  details.variationIndex = variationIndex;
+  
+  return details;
+}
