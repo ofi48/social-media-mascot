@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProcessTab } from "./ProcessTab";
+import { ProcessVideoTab } from "./ProcessVideoTab";
 import { PresetManager } from "./PresetManager";
 import { ResultsTab } from "./ResultsTab";
 import { VideoPreview } from "./VideoPreview";
@@ -128,29 +128,7 @@ export const VideoRepurposer = () => {
             </TabsList>
             
             <TabsContent value="process" className="mt-6">
-              <ProcessTab
-                uploadedFile={uploadedFile}
-                uploadedFileUrl={uploadedFileUrl}
-                processing={isProcessing}
-                progress={progress}
-                numCopies={3}
-                setNumCopies={() => {}}
-                settings={settings}
-                setSettings={setSettings}
-                handleFileSelect={handleFileSelect}
-                handleStartProcess={() => processVideo(3, settings)}
-                queueFiles={queueFiles}
-                queue={queue}
-                isProcessing={isBatchProcessing}
-                currentItem={currentItem}
-                onFilesAdded={handleFilesAdded}
-                onFileRemoved={handleFileRemoved}
-                onClearFiles={handleClearFiles}
-                onRemoveFromQueue={removeFromQueue}
-                onRetryJob={retryJob}
-                onClearQueue={clearQueue}
-                onStartBatch={handleStartBatch}
-              />
+              <ProcessVideoTab />
             </TabsContent>
             
             <TabsContent value="presets" className="mt-6">

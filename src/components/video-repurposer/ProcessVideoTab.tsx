@@ -6,7 +6,7 @@ import { useVideoProcessingContext } from "./VideoProcessingProvider";
 import { VideoProcessingPanel } from "./VideoProcessingPanel";
 
 export function ProcessVideoTab() {
-  const { processingMode, setProcessingMode } = useVideoProcessingContext();
+  const { processingMode, setProcessingMode, settings } = useVideoProcessingContext();
 
   return (
     <div className="space-y-6">
@@ -26,11 +26,11 @@ export function ProcessVideoTab() {
             </TabsList>
             
             <TabsContent value="single" className="mt-6">
-              <SingleVideoProcessor />
+              <SingleVideoProcessor settings={settings} />
             </TabsContent>
             
             <TabsContent value="batch" className="mt-6">
-              <VideoQueue />
+              <VideoQueue settings={settings} />
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -28,7 +28,7 @@ export function SingleVideoProcessor({ settings }: SingleVideoProcessorProps) {
 
   const handleProcess = async () => {
     if (!selectedFile) return;
-    await singleProcessing.processVideo(selectedFile, settings);
+    await singleProcessing.processVideo(variations, settings);
   };
 
   const getEnabledParametersCount = () => {

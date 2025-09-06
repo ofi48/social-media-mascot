@@ -15,7 +15,7 @@ interface VideoQueueProps {
 
 export function VideoQueue({ settings }: VideoQueueProps) {
   const [numVariations, setNumVariations] = useState(3);
-  const { queue, isProcessing, addVideosToQueue, processBatch } = useVideoQueue();
+  const { queue, isProcessing, addVideosToQueue, processBatch, removeFromQueue, retryJob, clearQueue } = useVideoQueue();
 
   const handleFilesUpload = (files: File[]) => {
     addVideosToQueue(files, settings, numVariations);
@@ -87,9 +87,9 @@ export function VideoQueue({ settings }: VideoQueueProps) {
         queue={queue}
         isProcessing={isProcessing}
         currentItem={null}
-        onRemove={() => {}}
-        onRetry={() => {}}
-        onClear={() => {}}
+        onRemove={removeFromQueue}
+        onRetry={retryJob}
+        onClear={clearQueue}
       />
     </div>
   );
