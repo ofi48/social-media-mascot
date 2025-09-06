@@ -125,61 +125,30 @@ async function createVideoVariations(
   const extension = videoFile.name.split('.').pop() || 'mp4';
   const timestamp = Date.now();
   
-  // First, upload the original video once
-  const originalPath = `videos/original_${originalName}_${timestamp}.${extension}`;
-  console.log(`[${requestId}] Uploading original video to: ${originalPath}`);
-  
-  try {
-    const { data: originalUpload, error: originalError } = await supabase.storage
-      .from('processed-videos')
-      .upload(originalPath, videoFile, {
-        contentType: videoFile.type,
-        upsert: true
-      });
-    
-    if (originalError) {
-      console.error(`[${requestId}] Original upload error:`, originalError);
-      throw new Error(`Failed to upload original video: ${originalError.message}`);
-    }
-    
-    // Get the original video URL
-    const { data: originalUrlData } = supabase.storage
-      .from('processed-videos')
-      .getPublicUrl(originalPath);
-    
-    console.log(`[${requestId}] Original video uploaded successfully: ${originalUrlData.publicUrl}`);
-    
-    // Create variations by copying the original with different names and processing details
-    for (let i = 0; i < numCopies; i++) {
-      try {
-        // Generate unique processing details for this variation
-        const processingDetails = generateProcessingDetails(settings, i);
+  // Process each variation individually
+  for (let i = 0; i < numCopies; i++) {
+    try {
+      // Generate unique processing details for this variation
+      const processingDetails = generateProcessingDetails(settings, i);
+      
+      // Create unique filename for this variation
+      const variationName = `${originalName}_variation_${i + 1}_${timestamp}_${Math.random().toString(36).substr(2, 6)}.${extension}`;
+      const variationPath = `videos/${variationName}`;
+      
+      console.log(`[${requestId}] Creating variation ${i + 1}/${numCopies}: ${variationName}`);
         
-        // Create unique filename for this variation
-        const variationName = `${originalName}_variation_${i + 1}_${timestamp}_${Math.random().toString(36).substr(2, 6)}.${extension}`;
-        const variationPath = `videos/${variationName}`;
-        
-        console.log(`[${requestId}] Creating variation ${i + 1}/${numCopies}: ${variationName}`);
-        
-        // Copy the original file to create a variation
-        const { data: copyData, error: copyError } = await supabase.storage
+        // Create variation by uploading the original file with a new name
+        // (Storage copy might not be available, so we re-upload)
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('processed-videos')
-          .copy(originalPath, variationPath);
+          .upload(variationPath, videoFile, {
+            contentType: videoFile.type,
+            upsert: true
+          });
         
-        if (copyError) {
-          console.error(`[${requestId}] Copy error for variation ${i + 1}:`, copyError);
-          // If copy fails, upload the original file again with new name
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('processed-videos')
-            .upload(variationPath, videoFile, {
-              contentType: videoFile.type,
-              upsert: true
-            });
-          
-          if (uploadError) {
-            console.error(`[${requestId}] Upload error for variation ${i + 1}:`, uploadError);
-            continue; // Skip this variation
-          }
+        if (uploadError) {
+          console.error(`[${requestId}] Upload error for variation ${i + 1}:`, uploadError);
+          continue; // Skip this variation
         }
         
         // Get public URL for the variation
@@ -203,11 +172,6 @@ async function createVideoVariations(
         // Continue with other variations
       }
     }
-    
-  } catch (error) {
-    console.error(`[${requestId}] Error in variation creation:`, error);
-    throw error;
-  }
   
   console.log(`[${requestId}] Final results count: ${results.length}`);
   return results;
