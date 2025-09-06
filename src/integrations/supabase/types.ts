@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      video_processing_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          file_size_mb: number | null
+          id: string
+          job_id: string
+          num_copies: number | null
+          original_filename: string
+          results: Json | null
+          settings: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size_mb?: number | null
+          id?: string
+          job_id: string
+          num_copies?: number | null
+          original_filename: string
+          results?: Json | null
+          settings?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size_mb?: number | null
+          id?: string
+          job_id?: string
+          num_copies?: number | null
+          original_filename?: string
+          results?: Json | null
+          settings?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -57,6 +57,10 @@ export interface VideoVariant {
   filename: string;
   blob: Blob;
   originalFile: File;
+  processingDetails?: {
+    jobId?: string;
+    [key: string]: any;
+  };
 }
 
 export interface ProcessedResult {

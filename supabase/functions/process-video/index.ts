@@ -53,10 +53,10 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (increased to 200MB for better user experience)
-    const maxSize = 200 * 1024 * 1024; // 200MB
+    // Validate file size (100MB max as requested)
+    const maxSize = 100 * 1024 * 1024; // 100MB
     if (videoFile.size > maxSize) {
-      throw new Error(`File size exceeds 200MB limit. Please compress your video first. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
+      throw new Error(`File size exceeds 100MB limit. Please compress your video first. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     }
     
     const settings = JSON.parse(settingsStr);
@@ -73,6 +73,30 @@ serve(async (req) => {
     // Generate unique job ID for tracking
     const jobId = `job_${requestId}_${Date.now()}`;
     
+    // Initialize Supabase client for job tracking
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    
+    // Create job record in database
+    const { data: jobData, error: jobError } = await supabase
+      .from('video_processing_jobs')
+      .insert({
+        job_id: jobId,
+        original_filename: videoFile.name,
+        file_size_mb: (videoFile.size / (1024 * 1024)),
+        settings: settings,
+        num_copies: numCopies,
+        status: 'processing'
+      })
+      .select()
+      .single();
+    
+    if (jobError) {
+      console.error(`[${requestId}] Failed to create job record:`, jobError);
+      throw new Error('Failed to create processing job');
+    }
+    
     // Return immediate response with job ID for async processing
     const response: ProcessVideoResponse = {
       success: true,
@@ -82,8 +106,8 @@ serve(async (req) => {
         processingDetails: {
           jobId: jobId,
           status: 'processing',
-          message: 'Your video is being processed. This may take several minutes for large files.',
-          estimatedTime: Math.ceil(videoFile.size / (1024 * 1024) * 15) // Rough estimate: 15 seconds per MB
+          message: 'Your video is being processed. Check back in a few minutes.',
+          estimatedTime: Math.ceil(videoFile.size / (1024 * 1024) * 10) // 10 seconds per MB estimate
         }
       }]
     };
@@ -135,6 +159,11 @@ async function processVideoInBackground(
   isComparison: boolean,
   jobId: string
 ) {
+  // Initialize Supabase client
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseKey)
+  
   try {
     console.log(`[${requestId}] Background processing started for job: ${jobId}`);
     
@@ -143,13 +172,37 @@ async function processVideoInBackground(
     
     console.log(`[${requestId}] Background processing completed for job: ${jobId} with ${results.length} results`);
     
-    // Here you could store the results in a database or send a webhook
-    // For now, we'll just log success
+    // Update job record with results
+    const { error: updateError } = await supabase
+      .from('video_processing_jobs')
+      .update({
+        status: 'completed',
+        results: results,
+        completed_at: new Date().toISOString()
+      })
+      .eq('job_id', jobId);
+    
+    if (updateError) {
+      console.error(`[${requestId}] Failed to update job record:`, updateError);
+    } else {
+      console.log(`[${requestId}] Job ${jobId} marked as completed in database`);
+    }
     
   } catch (error) {
     console.error(`[${requestId}] Background processing failed for job: ${jobId}:`, error);
     
-    // Handle error - could store error state in database or send notification
+    // Update job record with error
+    const { error: updateError } = await supabase
+      .from('video_processing_jobs')
+      .update({
+        status: 'failed',
+        error_message: error.message || 'Unknown error occurred'
+      })
+      .eq('job_id', jobId);
+    
+    if (updateError) {
+      console.error(`[${requestId}] Failed to update job error:`, updateError);
+    }
   }
 }
 
