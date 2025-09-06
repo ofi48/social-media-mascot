@@ -7,9 +7,9 @@ export interface VideoValidationResult {
   needsPreprocessing: boolean;
 }
 
-export const validateVideoFile = async (file: File): Promise<VideoValidationResult> => {
+export const validateVideoFile = async (file: File, maxSizeBytes?: number): Promise<VideoValidationResult> => {
   const errors: string[] = [];
-  const maxSize = 100 * 1024 * 1024; // 100MB
+  const maxSize = maxSizeBytes || 100 * 1024 * 1024; // 100MB default
   const acceptedTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
 
   // Size validation
@@ -60,11 +60,11 @@ export const getVideoDuration = (file: File): Promise<number> => {
   });
 };
 
-export const validateAndShowErrors = async (files: File[]): Promise<File[]> => {
+export const validateAndShowErrors = async (files: File[], maxSize?: number): Promise<File[]> => {
   const validFiles: File[] = [];
   
   for (const file of files) {
-    const validation = await validateVideoFile(file);
+    const validation = await validateVideoFile(file, maxSize);
     
     if (!validation.isValid) {
       toast.error(`❌ ${file.name}: ${validation.errors.join(', ')}`);

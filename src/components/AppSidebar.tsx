@@ -1,4 +1,4 @@
-import { Video, Search, Image, Scan } from "lucide-react";
+import { Video, Search, Image, Scan, Film } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import {
@@ -14,6 +14,7 @@ import {
 
 const tools = [
   { title: "Video Repurposer", url: "/video-repurposer", icon: Video },
+  { title: "Video Spoofer", url: "/video-spoofer", icon: Film },
   { title: "Video Similarity", url: "/video-similarity", icon: Search },
   { title: "Image Similarity", url: "/image-similarity", icon: Scan },
   { title: "Image Spoofer", url: "/image-spoofer", icon: Image },
