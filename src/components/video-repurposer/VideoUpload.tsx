@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { Card, CardContent } from '@/components/ui/card';
 import { Upload, Video, FileText } from 'lucide-react';
 import { formatBytes } from '@/utils/videoProcessing';
+import { validateAndShowErrors } from '@/utils/videoValidation';
 import { toast } from 'sonner';
 
 interface VideoUploadProps {
@@ -19,38 +20,45 @@ export function VideoUpload({
   maxSize = 50 * 1024 * 1024 // 50MB para alinear con Supabase Free tier
 }: VideoUploadProps) {
   
-  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
-    // Handle rejected files
+  const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    // Handle rejected files from dropzone validation
     if (rejectedFiles.length > 0) {
       rejectedFiles.forEach(({ file, errors }) => {
         errors.forEach((error: any) => {
           switch (error.code) {
             case 'file-too-large':
-              toast.error(`${file.name} es demasiado grande. Máximo ${formatBytes(maxSize)}`);
+              toast.error(`❌ ${file.name}: File too large. Maximum ${formatBytes(maxSize)}`);
               break;
             case 'file-invalid-type':
-              toast.error(`${file.name} no es un archivo de video válido`);
+              toast.error(`❌ ${file.name}: Invalid video file type`);
               break;
             default:
-              toast.error(`Error con ${file.name}: ${error.message}`);
+              toast.error(`❌ ${file.name}: ${error.message}`);
           }
         });
       });
     }
 
-    // Handle accepted files
+    // Validate accepted files (duration, preprocessing needs, etc.)
     if (acceptedFiles.length > 0) {
-      onFilesSelected(acceptedFiles);
-      toast.success(
-        `${acceptedFiles.length} video${acceptedFiles.length > 1 ? 's' : ''} seleccionado${acceptedFiles.length > 1 ? 's' : ''}`
-      );
+      toast.info('🔍 Validating video files...');
+      const validFiles = await validateAndShowErrors(acceptedFiles);
+      
+      if (validFiles.length > 0) {
+        onFilesSelected(validFiles);
+        toast.success(
+          `✅ ${validFiles.length} video${validFiles.length > 1 ? 's' : ''} ready for processing`
+        );
+      }
     }
   }, [onFilesSelected, maxSize]);
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
     accept: {
-      'video/*': ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm']
+      'video/mp4': ['.mp4'],
+      'video/webm': ['.webm'],
+      'video/quicktime': ['.mov']
     },
     multiple,
     disabled,
@@ -107,10 +115,10 @@ export function VideoUpload({
               <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <FileText className="h-3 w-3" />
-                  <span>MP4, AVI, MOV, MKV</span>
+                  <span>MP4, WebM, QuickTime</span>
                 </div>
                 <span>•</span>
-                <span>Máximo {formatBytes(maxSize)}</span>
+                <span>Max {formatBytes(maxSize)} • 3 min duration</span>
               </div>
             </div>
             

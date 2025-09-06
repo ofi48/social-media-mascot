@@ -51,7 +51,7 @@ serve(async (req) => {
     // Validate file size (50MB max to align with Supabase Free tier)
     const maxSize = 50 * 1024 * 1024; // 50MB
     if (videoFile.size > maxSize) {
-      throw new Error(`File size exceeds 50MB limit. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
+      throw new Error(`File size exceeds 50MB limit. Please compress your video first. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     }
     
     const settings = JSON.parse(settingsStr);
@@ -127,13 +127,21 @@ async function processVideoOnRailway(
     
     console.log(`[${requestId}] Sending request to Railway: ${railwayUrl}`);
     
-    const response = await fetch(railwayUrl, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'Accept': 'application/json',
-      }
-    });
+    // Enhanced timeout and retry logic for Railway request
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Railway processing timeout (3 minutes)')), 180000)
+    );
+
+    const response = await Promise.race([
+      fetch(railwayUrl, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+        }
+      }),
+      timeoutPromise
+    ]) as Response;
     
     console.log(`[${requestId}] Railway response status: ${response.status}`);
     console.log(`[${requestId}] Railway response headers:`, Object.fromEntries(response.headers.entries()));
@@ -142,6 +150,16 @@ async function processVideoOnRailway(
       const errorText = await response.text();
       console.error(`[${requestId}] Railway error response:`, errorText);
       console.error(`[${requestId}] Response headers:`, Object.fromEntries(response.headers.entries()));
+      
+      // Enhanced error messages for common Railway failures
+      if (response.status === 502) {
+        throw new Error('Video processing server is temporarily unavailable. Please try with a smaller file.');
+      } else if (response.status === 413) {
+        throw new Error('Video file is too large for processing. Please compress it first.');
+      } else if (response.status >= 500) {
+        throw new Error('Video processing server error. Please try again with a smaller or shorter video.');
+      }
+      
       throw new Error(`Railway processing failed: ${response.status} - ${errorText}`);
     }
     

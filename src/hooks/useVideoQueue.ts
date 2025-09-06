@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { QueueItem, VideoPresetSettings } from '@/types/video-preset';
 import { supabase } from '@/integrations/supabase/client';
 import { generateProcessingParameters, safeLog } from '@/utils/videoProcessing';
+import { validateVideoFile } from '@/utils/videoValidation';
+import { useFFmpegPreprocessing, type PreprocessingProgress } from '@/hooks/useFFmpegPreprocessing';
 import { toast } from 'sonner';
 
 interface UseVideoQueueReturn {
@@ -13,12 +15,15 @@ interface UseVideoQueueReturn {
   clearQueue: () => void;
   retryJob: (jobId: string) => void;
   processBatch: () => Promise<void>;
+  preprocessingProgress: Record<string, PreprocessingProgress>;
 }
 
 export const useVideoQueue = (): UseVideoQueueReturn => {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentItem, setCurrentItem] = useState<string | null>(null);
+  const [preprocessingProgress, setPreprocessingProgress] = useState<Record<string, PreprocessingProgress>>({});
+  const { preprocessVideo } = useFFmpegPreprocessing();
 
   const addVideosToQueue = useCallback((files: File[], settings: VideoPresetSettings, numCopies: number): QueueItem[] => {
     const newItems: QueueItem[] = files.map(file => ({
@@ -116,16 +121,75 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
           ));
         }, 1000);
 
+        // Stage 1: Validation
+        setQueue(prev => prev.map(queueItem => 
+          queueItem.id === item.id 
+            ? { ...queueItem, progress: 5 }
+            : queueItem
+        ));
+
+        const validation = await validateVideoFile(item.file);
+        let fileToProcess = item.file;
+
+        // Stage 2: Conditional Preprocessing
+        if (validation.needsPreprocessing) {
+          setQueue(prev => prev.map(queueItem => 
+            queueItem.id === item.id 
+              ? { ...queueItem, progress: 10 }
+              : queueItem
+          ));
+
+          try {
+            fileToProcess = await preprocessVideo(item.file, {}, (progress) => {
+              setPreprocessingProgress(prev => ({
+                ...prev,
+                [item.id]: progress
+              }));
+              
+              // Update queue progress during preprocessing (10-50%)
+              const adjustedProgress = 10 + (progress.progress * 0.4);
+              setQueue(prev => prev.map(queueItem => 
+                queueItem.id === item.id 
+                  ? { ...queueItem, progress: adjustedProgress }
+                  : queueItem
+              ));
+            });
+
+            toast.success(`✅ ${item.fileName} compressed successfully`);
+          } catch (error) {
+            throw new Error(`Preprocessing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+
+        // Stage 3: Upload preparation
+        setQueue(prev => prev.map(queueItem => 
+          queueItem.id === item.id 
+            ? { ...queueItem, progress: 55 }
+            : queueItem
+        ));
+
         // Create FormData for processing
         const formData = new FormData();
-        formData.append('video', item.file);
+        formData.append('video', fileToProcess);
         formData.append('settings', JSON.stringify(item.settings));
         formData.append('numCopies', (item.numCopies || 3).toString());
 
-        // Call the processing function with improved error handling
-        const response = await supabase.functions.invoke('process-video', {
-          body: formData
-        });
+        // Stage 4: Server processing with timeout
+        setQueue(prev => prev.map(queueItem => 
+          queueItem.id === item.id 
+            ? { ...queueItem, progress: 60 }
+            : queueItem
+        ));
+
+        // Call the processing function with timeout
+        const response = await Promise.race([
+          supabase.functions.invoke('process-video', {
+            body: formData
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout (3 minutes)')), 180000)
+          )
+        ]) as any;
 
         if (progressInterval) clearInterval(progressInterval);
 
@@ -137,11 +201,15 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
         });
 
         if (response.error) {
+          // Show specific error message for Railway failures
+          if (response.error.message?.includes('non-2xx')) {
+            throw new Error('⚠️ Processing failed. Please try again with a smaller or shorter video.');
+          }
           throw new Error(`Edge Function error: ${response.error.message || 'Unknown error'}`);
         }
 
         if (!response.data?.success) {
-          throw new Error(`Processing failed: ${response.data?.error || 'Unknown error from Railway'}`);
+          throw new Error(`⚠️ Processing failed. Please try again with a smaller or shorter video.`);
         }
 
         const results = response.data.results || [];
@@ -193,8 +261,18 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
             : queueItem
         ));
 
-        // Show specific error toast
-        toast.error(`Error procesando ${item.fileName}: ${errorMessage}`);
+        // Show specific error toast with actionable message
+        if (errorMessage.includes('⚠️')) {
+          toast.error(errorMessage);
+        } else {
+          toast.error(`Error processing ${item.fileName}: ${errorMessage}`);
+        }
+        
+        // Clean up preprocessing progress
+        setPreprocessingProgress(prev => {
+          const { [item.id]: removed, ...rest } = prev;
+          return rest;
+        });
       }
 
       // Small delay between items
@@ -236,6 +314,7 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
     removeFromQueue,
     clearQueue,
     retryJob,
-    processBatch
+    processBatch,
+    preprocessingProgress
   };
 };

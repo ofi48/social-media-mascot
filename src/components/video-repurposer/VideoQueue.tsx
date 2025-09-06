@@ -15,7 +15,7 @@ interface VideoQueueProps {
 
 export function VideoQueue({ settings }: VideoQueueProps) {
   const [numVariations, setNumVariations] = useState(3);
-  const { queue, isProcessing, addVideosToQueue, processBatch, removeFromQueue, retryJob, clearQueue } = useVideoQueue();
+  const { queue, isProcessing, addVideosToQueue, processBatch, removeFromQueue, retryJob, clearQueue, preprocessingProgress } = useVideoQueue();
 
   const handleFilesUpload = (files: File[]) => {
     addVideosToQueue(files, settings, numVariations);
