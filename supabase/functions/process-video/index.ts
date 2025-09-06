@@ -61,8 +61,12 @@ serve(async (req) => {
     console.log(`[${requestId}] File size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     console.log(`[${requestId}] Settings:`, settings);
     
+    // Verificar si es comparación
+    const operation = formData.get('operation');
+    const isComparison = operation && String(operation).includes('compare');
+
     // Send to Railway for processing
-    const results = await processVideoOnRailway(videoFile, settings, numCopies, requestId);
+    const results = await processVideoOnRailway(videoFile, settings, numCopies, requestId, isComparison);
     
     console.log(`[${requestId}] Processing results:`, results);
     console.log(`[${requestId}] Number of results:`, results.length);
@@ -109,7 +113,8 @@ async function processVideoOnRailway(
   videoFile: File, 
   settings: any, 
   numCopies: number,
-  requestId: string
+  requestId: string,
+  isComparison: boolean = false
 ): Promise<Array<{name: string, url: string, processingDetails: any}>> {
   
   console.log(`[${requestId}] Sending video to Railway for processing`);
@@ -122,8 +127,10 @@ async function processVideoOnRailway(
     formData.append('numCopies', numCopies.toString());
     formData.append('requestId', requestId);
     
-    // Send to Railway processing server
-    const railwayUrl = 'https://social-media-mascot-production.up.railway.app/process-video';
+    // Seleccionar endpoint
+    const railwayUrl = isComparison 
+      ? "https://social-media-mascot.railway.internal/compare-media"
+      : "https://social-media-mascot.railway.internal/process-video";
     
     console.log(`[${requestId}] Sending request to Railway: ${railwayUrl}`);
     
@@ -142,6 +149,14 @@ async function processVideoOnRailway(
       }),
       timeoutPromise
     ]) as Response;
+
+    const contentType = response.headers.get('content-type');
+
+    if (!contentType || !contentType.includes('application/json')) {
+      const textResponse = await response.text();
+      console.error(`[${requestId}] Railway returned non-JSON response:`, textResponse);
+      throw new Error('Server returned non-JSON response');
+    }
     
     console.log(`[${requestId}] Railway response status: ${response.status}`);
     console.log(`[${requestId}] Railway response headers:`, Object.fromEntries(response.headers.entries()));
@@ -202,7 +217,7 @@ async function uploadProcessedVideos(
       
       // Download the processed video from Railway
       const videoUrl = result.url.startsWith('/') 
-        ? `https://social-media-mascot-production.up.railway.app${result.url}`
+        ? `https://social-media-mascot.railway.internal${result.url}`
         : result.url;
       const videoResponse = await fetch(videoUrl);
       if (!videoResponse.ok) {

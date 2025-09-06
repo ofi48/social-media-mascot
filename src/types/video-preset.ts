@@ -110,48 +110,48 @@ export interface VideoMetadata {
 }
 
 export const DEFAULT_PRESET: VideoPresetSettings = {
-  // Calidad
-  videoBitrate: { min: 500, max: 2000, enabled: true },
-  audioBitrate: { min: 128, max: 320, enabled: true },
-  frameRate: { min: 24, max: 30, enabled: false },
+  // Calidad de Video
+  videoBitrate: { min: 3000, max: 8000, enabled: true },
+  audioBitrate: { min: 128, max: 192, enabled: false },
+  frameRate: { min: 30, max: 30, enabled: false },
   
-  // Color
-  saturation: { min: 0.8, max: 1.2, enabled: true },
+  // Ajustes de Color
+  saturation: { min: 0.9, max: 1.1, enabled: true },
   contrast: { min: 0.9, max: 1.1, enabled: true },
   brightness: { min: -0.1, max: 0.1, enabled: true },
-  gamma: { min: 0.8, max: 1.2, enabled: false },
+  gamma: { min: 0.9, max: 1.1, enabled: false },
   
-  // Efectos
+  // Efectos Visuales
   vignette: { min: 0, max: 0.3, enabled: false },
-  noise: { min: 0, max: 10, enabled: false },
-  waveformShift: { min: 0, max: 5, enabled: false },
+  noise: { min: 0, max: 0.05, enabled: false },
+  waveformShift: { min: 0, max: 2, enabled: false },
   pixelShift: { min: 0, max: 2, enabled: false },
   
   // Transformaciones
   speed: { min: 0.95, max: 1.05, enabled: true },
-  zoom: { min: 1.0, max: 1.02, enabled: true },
-  rotation: { min: -1, max: 1, enabled: false },
+  zoom: { min: 1, max: 1.05, enabled: false },
+  rotation: { min: -2, max: 2, enabled: false },
   flipHorizontal: false,
   
-  // Tamaño y recorte
-  pixelSize: "original",
+  // Recorte y Tamaño
+  pixelSize: "",
   randomPixelSize: false,
-  trimStart: { min: 0, max: 2, enabled: false },
-  trimEnd: { min: 0, max: 2, enabled: false },
+  trimStart: { min: 0, max: 1, enabled: true },
+  trimEnd: { min: 0, max: 1, enabled: false },
   
-  // Especiales
+  // Características Especiales
   usMetadata: false,
-  blurredBorder: { min: 0, max: 10, enabled: false },
+  blurredBorder: { min: 0, max: 30, enabled: false },
   
   // Audio
-  volume: { min: 0.9, max: 1.1, enabled: true },
+  volume: { min: 0.9, max: 1.1, enabled: false },
   
-  // Marca de agua
+  // Marca de Agua
   watermark: {
     enabled: false,
-    size: 50,
+    size: 100,
     opacity: 0.5,
-    x: 10,
-    y: 10
+    x: 0.5,
+    y: 0.5
   }
 };

@@ -9,27 +9,23 @@ export interface VideoValidationResult {
 
 export const validateVideoFile = async (file: File): Promise<VideoValidationResult> => {
   const errors: string[] = [];
-  const maxSize = 50 * 1024 * 1024; // 50MB
-  const maxDuration = 180; // 3 minutes
-  const acceptedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+  const maxSize = 100 * 1024 * 1024; // 100MB
+  const acceptedTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
 
   // Size validation
   if (file.size > maxSize) {
-    errors.push(`File size ${(file.size / 1024 / 1024).toFixed(1)}MB exceeds 50MB limit`);
+    errors.push(`File size ${(file.size / 1024 / 1024).toFixed(1)}MB exceeds 100MB limit`);
   }
 
   // Type validation
   if (!acceptedTypes.includes(file.type)) {
-    errors.push(`File type ${file.type} not supported. Use MP4, WebM, or QuickTime`);
+    errors.push(`File type ${file.type} not supported. Use MP4, MOV, AVI, or WebM`);
   }
 
-  // Duration validation
+  // Get duration for preprocessing decision
   let duration = 0;
   try {
     duration = await getVideoDuration(file);
-    if (duration > maxDuration) {
-      errors.push(`Duration ${Math.round(duration)}s exceeds 3 minutes limit`);
-    }
   } catch (error) {
     errors.push('Could not read video duration');
   }
