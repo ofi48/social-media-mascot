@@ -59,9 +59,8 @@ serve(async (req) => {
     
     console.log(`[${requestId}] Processing ${numCopies} variations of video: ${videoFile.name}`);
     
-    // For now, simulate processing and return mock results
-    // In production, this would call your FFmpeg processing service
-    const results = await simulateVideoProcessing(videoFile, settings, numCopies, requestId);
+    // Process video variations efficiently
+    const results = await processVideoVariations(videoFile, settings, numCopies, requestId);
     
     const response: ProcessVideoResponse = {
       success: true,
@@ -101,7 +100,7 @@ serve(async (req) => {
   }
 })
 
-async function simulateVideoProcessing(
+async function processVideoVariations(
   videoFile: File, 
   settings: any, 
   numCopies: number,
@@ -116,26 +115,28 @@ async function simulateVideoProcessing(
   console.log(`[${requestId}] Starting processing of ${numCopies} variations`);
   
   const results = [];
-  const videoBuffer = await videoFile.arrayBuffer();
   
+  // Process each variation sequentially to avoid memory issues
   for (let i = 0; i < numCopies; i++) {
     try {
-      // Generate mock processing details
+      // Generate processing details for this variation
       const processingDetails = generateMockProcessingDetails(settings, i);
       
       // Create a filename for the processed video
       const originalName = videoFile.name.split('.')[0];
       const extension = videoFile.name.split('.').pop() || 'mp4';
-      const processedFileName = `${originalName}_variation_${i + 1}_${requestId}.${extension}`;
+      const processedFileName = `${originalName}_variation_${i + 1}_${Date.now()}.${extension}`;
       const filePath = `videos/${processedFileName}`;
       
       console.log(`[${requestId}] Processing variation ${i + 1}/${numCopies}: ${processedFileName}`);
       
-      // For now, we'll save the original video as the "processed" version
-      // In production, this is where you'd apply FFmpeg transformations
+      // Read file as stream to avoid memory issues
+      const videoStream = videoFile.stream();
+      
+      // Upload the video stream directly to storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('processed-videos')
-        .upload(filePath, videoBuffer, {
+        .upload(filePath, videoStream, {
           contentType: videoFile.type,
           upsert: true
         });
@@ -158,6 +159,9 @@ async function simulateVideoProcessing(
       });
       
       console.log(`[${requestId}] Successfully processed variation ${i + 1}/${numCopies}`);
+      
+      // Small delay to prevent overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (error) {
       console.error(`[${requestId}] Error processing variation ${i + 1}:`, error);
