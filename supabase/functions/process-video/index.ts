@@ -48,20 +48,20 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (200MB max)
-    const maxSize = 200 * 1024 * 1024; // 200MB
+    // Validate file size (500MB max for Railway processing)
+    const maxSize = 500 * 1024 * 1024; // 500MB
     if (videoFile.size > maxSize) {
-      throw new Error(`File size exceeds 200MB limit. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
+      throw new Error(`File size exceeds 500MB limit. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     }
     
     const settings = JSON.parse(settingsStr);
     const numCopies = parseInt(numCopiesStr);
     
-    console.log(`[${requestId}] Processing ${numCopies} variations of video: ${videoFile.name}`);
+    console.log(`[${requestId}] Sending ${numCopies} variations to Railway for processing: ${videoFile.name}`);
     console.log(`[${requestId}] Settings:`, settings);
     
-    // Process video variations efficiently - one at a time
-    const results = await createVideoVariations(videoFile, settings, numCopies, requestId);
+    // Send to Railway for processing
+    const results = await processVideoOnRailway(videoFile, settings, numCopies, requestId);
     
     console.log(`[${requestId}] Processing results:`, results);
     console.log(`[${requestId}] Number of results:`, results.length);
@@ -104,10 +104,65 @@ serve(async (req) => {
   }
 })
 
-async function createVideoVariations(
+async function processVideoOnRailway(
   videoFile: File, 
   settings: any, 
   numCopies: number,
+  requestId: string
+): Promise<Array<{name: string, url: string, processingDetails: any}>> {
+  
+  console.log(`[${requestId}] Sending video to Railway for processing`);
+  
+  try {
+    // Create FormData for Railway request
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    formData.append('settings', JSON.stringify(settings));
+    formData.append('numCopies', numCopies.toString());
+    formData.append('requestId', requestId);
+    
+    // Send to Railway processing server
+    const railwayUrl = 'https://video-server-production-d7af.up.railway.app/process-video';
+    
+    console.log(`[${requestId}] Sending request to Railway: ${railwayUrl}`);
+    
+    const response = await fetch(railwayUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
+    
+    console.log(`[${requestId}] Railway response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[${requestId}] Railway error response:`, errorText);
+      throw new Error(`Railway processing failed: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    console.log(`[${requestId}] Railway processing result:`, result);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Railway processing failed');
+    }
+    
+    // Upload processed videos to Supabase Storage and return public URLs
+    const finalResults = await uploadProcessedVideos(result.results, requestId);
+    
+    console.log(`[${requestId}] Final processed results count: ${finalResults.length}`);
+    return finalResults;
+    
+  } catch (error) {
+    console.error(`[${requestId}] Error in Railway processing:`, error);
+    throw error;
+  }
+}
+
+async function uploadProcessedVideos(
+  railwayResults: any[], 
   requestId: string
 ): Promise<Array<{name: string, url: string, processingDetails: any}>> {
   
@@ -116,175 +171,60 @@ async function createVideoVariations(
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, supabaseKey)
   
-  console.log(`[${requestId}] Creating ${numCopies} video variations`);
+  const uploadedResults = [];
   
-  const results = [];
-  
-  // Get file info
-  const originalName = videoFile.name.split('.')[0];
-  const extension = videoFile.name.split('.').pop() || 'mp4';
-  const timestamp = Date.now();
-  
-  try {
-    // First, upload the original video to get a stable URL
-    const originalPath = `source/${originalName}_${timestamp}.${extension}`;
-    console.log(`[${requestId}] Uploading original video to: ${originalPath}`);
+  for (let i = 0; i < railwayResults.length; i++) {
+    const result = railwayResults[i];
     
-    const { data: originalUpload, error: originalError } = await supabase.storage
-      .from('processed-videos')
-      .upload(originalPath, videoFile, {
-        contentType: videoFile.type,
-        upsert: true
-      });
-    
-    if (originalError) {
-      console.error(`[${requestId}] Failed to upload original:`, originalError);
-      throw new Error(`Failed to upload video: ${originalError.message}`);
-    }
-    
-    console.log(`[${requestId}] Original video uploaded successfully`);
-    
-    // Process each variation by creating a copy
-    for (let i = 0; i < numCopies; i++) {
-      try {
-        // Generate unique processing details for this variation
-        const processingDetails = generateProcessingDetails(settings, i);
-        
-        // Create unique filename for this variation
-        const variationName = `${originalName}_var${i + 1}_${timestamp}.${extension}`;
-        const variationPath = `processed/${variationName}`;
-        
-        console.log(`[${requestId}] Creating variation ${i + 1}/${numCopies}: ${variationName}`);
-        
-        // Create variation by copying the original file with new name
-        const { data: copyData, error: copyError } = await supabase.storage
-          .from('processed-videos')
-          .copy(originalPath, variationPath);
-        
-        if (copyError) {
-          console.error(`[${requestId}] Copy failed, attempting direct upload for variation ${i + 1}:`, copyError);
-          
-          // Fallback: upload the file again
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('processed-videos')
-            .upload(variationPath, videoFile, {
-              contentType: videoFile.type,
-              upsert: true
-            });
-          
-          if (uploadError) {
-            console.error(`[${requestId}] Upload fallback failed for variation ${i + 1}:`, uploadError);
-            continue; // Skip this variation
-          }
-        }
-        
-        // Get public URL for the variation
-        const { data: urlData } = supabase.storage
-          .from('processed-videos')
-          .getPublicUrl(variationPath);
-        
-        if (!urlData.publicUrl) {
-          console.error(`[${requestId}] Failed to get public URL for variation ${i + 1}`);
-          continue;
-        }
-        
-        results.push({
-          name: variationName,
-          url: urlData.publicUrl,
-          processingDetails: processingDetails
-        });
-        
-        console.log(`[${requestId}] Successfully created variation ${i + 1}/${numCopies}`);
-        
-        // Small delay between variations
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-      } catch (error) {
-        console.error(`[${requestId}] Error creating variation ${i + 1}:`, error);
-        // Continue with other variations
-      }
-    }
-    
-    // Clean up original file after processing
     try {
-      await supabase.storage.from('processed-videos').remove([originalPath]);
-      console.log(`[${requestId}] Cleaned up original file`);
+      console.log(`[${requestId}] Uploading processed video ${i + 1}/${railwayResults.length}: ${result.name}`);
+      
+      // Download the processed video from Railway
+      const videoResponse = await fetch(result.url);
+      if (!videoResponse.ok) {
+        console.error(`[${requestId}] Failed to download processed video ${result.name}`);
+        continue;
+      }
+      
+      const videoBlob = await videoResponse.blob();
+      const timestamp = Date.now();
+      const storagePath = `processed/${result.name}_${timestamp}.mp4`;
+      
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('processed-videos')
+        .upload(storagePath, videoBlob, {
+          contentType: 'video/mp4',
+          upsert: true
+        });
+      
+      if (uploadError) {
+        console.error(`[${requestId}] Failed to upload to Supabase:`, uploadError);
+        continue;
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('processed-videos')
+        .getPublicUrl(storagePath);
+      
+      if (!urlData.publicUrl) {
+        console.error(`[${requestId}] Failed to get public URL for ${result.name}`);
+        continue;
+      }
+      
+      uploadedResults.push({
+        name: result.name,
+        url: urlData.publicUrl,
+        processingDetails: result.processingDetails || {}
+      });
+      
+      console.log(`[${requestId}] Successfully uploaded ${result.name} to Supabase`);
+      
     } catch (error) {
-      console.warn(`[${requestId}] Failed to clean up original file:`, error);
+      console.error(`[${requestId}] Error uploading video ${result.name}:`, error);
     }
-    
-  } catch (error) {
-    console.error(`[${requestId}] Critical error in video processing:`, error);
-    throw error;
   }
   
-  console.log(`[${requestId}] Final results count: ${results.length}`);
-  return results;
-}
-
-function generateProcessingDetails(settings: any, variationIndex: number): any {
-  const details: any = {
-    variationIndex: variationIndex + 1,
-    processedAt: new Date().toISOString()
-  };
-  
-  // Apply only enabled settings with random values within range
-  if (settings.videoBitrate?.enabled) {
-    details.videoBitrate = Math.floor(
-      settings.videoBitrate.min + 
-      (settings.videoBitrate.max - settings.videoBitrate.min) * Math.random()
-    );
-  }
-  
-  if (settings.frameRate?.enabled) {
-    details.frameRate = Math.floor(
-      settings.frameRate.min + 
-      (settings.frameRate.max - settings.frameRate.min) * Math.random()
-    );
-  }
-  
-  if (settings.saturation?.enabled) {
-    details.saturation = Number((
-      settings.saturation.min + 
-      (settings.saturation.max - settings.saturation.min) * Math.random()
-    ).toFixed(2));
-  }
-  
-  if (settings.contrast?.enabled) {
-    details.contrast = Number((
-      settings.contrast.min + 
-      (settings.contrast.max - settings.contrast.min) * Math.random()
-    ).toFixed(2));
-  }
-  
-  if (settings.brightness?.enabled) {
-    details.brightness = Number((
-      settings.brightness.min + 
-      (settings.brightness.max - settings.brightness.min) * Math.random()
-    ).toFixed(2));
-  }
-  
-  if (settings.speed?.enabled) {
-    details.speed = Number((
-      settings.speed.min + 
-      (settings.speed.max - settings.speed.min) * Math.random()
-    ).toFixed(2));
-  }
-  
-  if (settings.flipHorizontal?.enabled) {
-    details.flipHorizontal = Math.random() > 0.5;
-  }
-  
-  if (settings.pixelSize && settings.pixelSize !== "original") {
-    details.pixelSize = settings.pixelSize;
-  }
-  
-  if (settings.volume?.enabled) {
-    details.volume = Number((
-      settings.volume.min + 
-      (settings.volume.max - settings.volume.min) * Math.random()
-    ).toFixed(2));
-  }
-  
-  return details;
+  return uploadedResults;
 }
