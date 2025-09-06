@@ -1,159 +1,96 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { Progress } from "@/components/ui/progress";
-import { Play, Trash2, X, RefreshCw, Upload } from "lucide-react";
-import { VideoUpload } from "./VideoUpload";
-import { useVideoProcessingContext } from "./VideoProcessingProvider";
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { VideoUpload } from './VideoUpload';
+import { VideoQueueComponent } from './VideoQueueComponent';
+import { useVideoQueue } from '@/hooks/useVideoQueue';
+import { VideoPresetSettings } from '@/types/video-preset';
+import { Play } from 'lucide-react';
 
-export function VideoQueue() {
-  const [variations, setVariations] = useState(3);
-  const { settings, batchProcessing } = useVideoProcessingContext();
+interface VideoQueueProps {
+  settings: VideoPresetSettings;
+}
+
+export function VideoQueue({ settings }: VideoQueueProps) {
+  const [numVariations, setNumVariations] = useState(3);
+  const { queue, isProcessing, addVideosToQueue, processBatch } = useVideoQueue();
 
   const handleFilesUpload = (files: File[]) => {
-    batchProcessing.addToQueue(files);
+    addVideosToQueue(files, settings, numVariations);
   };
 
-  const handleStartBatch = async () => {
-    await batchProcessing.processBatch(settings, variations);
+  const handleStartBatch = () => {
+    processBatch();
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'waiting': return 'bg-muted';
-      case 'processing': return 'bg-primary';
-      case 'completed': return 'bg-secondary';
-      case 'error': return 'bg-destructive';
-      default: return 'bg-muted';
-    }
-  };
+  const queuedVideos = queue.filter(job => job.status === 'waiting').length;
+  const totalVideos = queue.length;
 
   return (
     <div className="space-y-6">
-      <VideoUpload 
-        onFilesSelected={handleFilesUpload} 
-        multiple 
-        disabled={batchProcessing.isProcessing} 
-      />
-
+      {/* Video Upload Section */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Cola de Procesamiento</CardTitle>
-              <CardDescription>{batchProcessing.queue.length} videos en cola</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Variaciones:</span>
-                <Badge variant="secondary">{variations}</Badge>
-              </div>
-              <Slider
-                value={[variations]}
-                onValueChange={([value]) => setVariations(value)}
-                min={1}
-                max={20}
-                step={1}
-                className="w-24"
-                disabled={batchProcessing.isProcessing}
-              />
-            </div>
-          </div>
+          <CardTitle>Subir Videos para Procesamiento por Lotes</CardTitle>
         </CardHeader>
-        
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>Total: {batchProcessing.queue.length}</span>
-              <span>Esperando: {batchProcessing.queue.filter(j => j.status === 'waiting').length}</span>
-              <span>Procesando: {batchProcessing.queue.filter(j => j.status === 'processing').length}</span>
-              <span>Completados: {batchProcessing.queue.filter(j => j.status === 'completed').length}</span>
-              <span>Errores: {batchProcessing.queue.filter(j => j.status === 'error').length}</span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={batchProcessing.clearQueue}
-                disabled={batchProcessing.isProcessing || batchProcessing.queue.length === 0}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Limpiar Cola
-              </Button>
-              <Button
-                onClick={handleStartBatch}
-                disabled={batchProcessing.isProcessing || batchProcessing.queue.filter(job => job.status === 'waiting').length === 0}
-              >
-                <Play className="mr-2 h-4 w-4" />
-                {batchProcessing.isProcessing ? 'Procesando...' : 'Iniciar Lote'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {batchProcessing.queue.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Upload className="mx-auto h-12 w-12 mb-4" />
-                <p>No hay videos en la cola. Sube videos para comenzar el procesamiento por lotes.</p>
-              </div>
-            ) : (
-              batchProcessing.queue.map((job) => (
-                <Card key={job.id}>
-                  <CardContent className="py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Badge 
-                          variant="outline" 
-                          className={`${getStatusColor(job.status)} text-white border-none min-w-[80px] justify-center`}
-                        >
-                          {job.status === 'waiting' && 'Esperando'}
-                          {job.status === 'processing' && 'Procesando'}
-                          {job.status === 'completed' && 'Completado'}
-                          {job.status === 'error' && 'Error'}
-                        </Badge>
-                        
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{job.filename}</p>
-                          {job.status === 'processing' && (
-                            <Progress value={job.progress} className="h-1 mt-1" />
-                          )}
-                          {job.status === 'error' && job.errorMessage && (
-                            <p className="text-xs text-destructive mt-1">{job.errorMessage}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        {job.status === 'error' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => batchProcessing.retryJob(job.id)}
-                            disabled={batchProcessing.isProcessing}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => batchProcessing.removeFromQueue(job.id)}
-                          disabled={batchProcessing.isProcessing && job.status === 'processing'}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+        <CardContent>
+          <VideoUpload onFilesSelected={handleFilesUpload} />
         </CardContent>
       </Card>
+
+      {/* Queue Configuration */}
+      {totalVideos > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuración del Lote</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="variations">Variaciones por Video</Label>
+                <Input
+                  id="variations"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={numVariations}
+                  onChange={(e) => setNumVariations(parseInt(e.target.value) || 3)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={handleStartBatch}
+                  disabled={isProcessing || queuedVideos === 0}
+                  className="w-full flex items-center gap-2"
+                >
+                  <Play className="h-4 w-4" />
+                  {isProcessing 
+                    ? 'Procesando...' 
+                    : `Procesar ${queuedVideos} Video${queuedVideos > 1 ? 's' : ''}`
+                  }
+                </Button>
+              </div>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              Total: {totalVideos} videos • En cola: {queuedVideos} • 
+              Variaciones por video: {numVariations}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Queue Display */}
+      <VideoQueueComponent
+        queue={queue}
+        isProcessing={isProcessing}
+        currentItem={null}
+        onRemove={() => {}}
+        onRetry={() => {}}
+        onClear={() => {}}
+      />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { MultiFileUpload } from './MultiFileUpload';
-import { VideoQueue } from './VideoQueue';
+import { VideoQueueComponent } from './VideoQueueComponent';
 import { ParameterSection } from './ParameterSection';
 import { VideoPresetSettings, QueueItem } from '@/types/video-preset';
 
@@ -221,7 +221,7 @@ export const ProcessTab: React.FC<ProcessTabProps> = ({
               )}
 
               {/* Queue Display */}
-              <VideoQueue
+              <VideoQueueComponent
                 queue={queue}
                 isProcessing={isProcessing}
                 currentItem={currentItem}

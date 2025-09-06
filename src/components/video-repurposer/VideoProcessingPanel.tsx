@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import { useVideoProcessingContext } from "./VideoProcessingProvider";
-import { RangeValue, SimpleValue } from "@/types/video-preset";
+import { VideoPresetSettings, RangeValue } from '@/types/video-preset';
 
 export function VideoProcessingPanel() {
   const { settings, updateSettings, resetSettings } = useVideoProcessingContext();
@@ -23,13 +23,9 @@ export function VideoProcessingPanel() {
     });
   };
 
-  const updateSimpleValue = (key: string, field: 'value' | 'enabled', value: number | boolean) => {
-    const currentValue = settings[key as keyof typeof settings] as SimpleValue;
+  const updateSimpleValue = (key: string, value: boolean) => {
     updateSettings({
-      [key]: {
-        ...currentValue,
-        [field]: value
-      }
+      [key]: value
     });
   };
 
@@ -327,8 +323,10 @@ export function VideoProcessingPanel() {
                 <div className="flex items-center justify-between">
                   <Label>Voltear Horizontalmente</Label>
                   <Switch
-                    checked={settings.flipHorizontal.enabled}
-                    onCheckedChange={(checked) => updateSimpleValue('flipHorizontal', 'enabled', checked)}
+                    checked={settings.flipHorizontal}
+                    onCheckedChange={(checked) => updateSettings({
+                      flipHorizontal: checked
+                    })}
                   />
                 </div>
               </div>

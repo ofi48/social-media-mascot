@@ -136,10 +136,6 @@ export const useVideoProcessing = (): UseVideoProcessingReturn => {
       toast.success(`Successfully generated ${resultsWithParams.length} video variants`);
 
     } catch (error) {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setError(errorMessage);
       safeLog('Video processing failed', { error: errorMessage });
