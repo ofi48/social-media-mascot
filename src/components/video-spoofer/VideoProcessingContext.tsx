@@ -288,7 +288,8 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         video.onseeked = () => {
           try {
             // Set up MediaRecorder with simplified settings for better performance
-            const stream = canvas.captureStream(15); // Lower FPS for better performance
+            const targetFPS = 25; // Align rendering and recording FPS for stable duration
+            const stream = canvas.captureStream(targetFPS);
             
             // Simplified bitrate - use browser defaults for better compatibility
             let mediaRecorder;
@@ -308,8 +309,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             
             const chunks: Blob[] = [];
             let frameCount = 0;
-            const targetFPS = 15; // Reduced FPS for performance
-            const maxFrames = Math.ceil(duration * targetFPS);
+            const maxFrames = Math.ceil(duration * targetFPS) + 2; // safety margin
             
             mediaRecorder.ondataavailable = (event) => {
               if (event.data.size > 0) {
@@ -358,7 +358,9 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
                 Math.random() * (params.gamma.max - params.gamma.min) + params.gamma.min : 1,
               vignetteStrength: params.vignette.enabled ?
                 Math.random() * (params.vignette.max - params.vignette.min) + params.vignette.min : 0,
-              // Pre-calculate trim values
+              blurredBorderSize: params.blurredBorder.enabled ?
+                Math.random() * (params.blurredBorder.max - params.blurredBorder.min) + params.blurredBorder.min : undefined,
+              // Pre-calculate trim values (not applied per-frame)
               trimStart: params.trimStart.enabled ?
                 Math.random() * (params.trimStart.max - params.trimStart.min) + params.trimStart.min : 0,
               trimEnd: params.trimEnd.enabled ?
@@ -367,66 +369,64 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             
             mediaRecorder.start();
             
+            // Time-based render loop aligned to targetFPS to preserve duration
+            const frameInterval = 1000 / targetFPS;
+            let intervalId: number | null = null;
+            
             const renderFrame = () => {
-              frameCount++;
-              
-              // Stop if we've reached the end time or max frames
+              // Stop if we've reached the end time or exceeded safety frames
               if (video.currentTime >= endTime || frameCount >= maxFrames) {
-                mediaRecorder.stop();
+                if (intervalId !== null) {
+                  clearInterval(intervalId);
+                }
+                setTimeout(() => {
+                  if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                  }
+                }, 150);
                 return;
               }
               
-              // Apply transformations and draw frame
-              ctx.save();
+              frameCount++;
               
-              // Clear canvas with black background
+              // Clear canvas
+              ctx.save();
               ctx.fillStyle = '#000000';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               
-              // Apply transformations
+              // Transformations
               ctx.translate(canvas.width / 2, canvas.height / 2);
-              
-              // Apply constant rotation throughout video
               if (params.rotation.enabled) {
                 ctx.rotate((constantEffects.rotation * Math.PI) / 180);
               }
-              
-              // Apply constant zoom and flip
               let scaleX = constantEffects.zoom, scaleY = constantEffects.zoom;
-              
               if (params.flipHorizontal) {
                 scaleX *= -1;
               }
-              
               ctx.scale(scaleX, scaleY);
               
-              // Draw video frame centered
+              // Draw video frame
               const drawWidth = canvas.width;
               const drawHeight = canvas.height;
               ctx.drawImage(video, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-              
               ctx.restore();
               
-              // Apply post-processing effects using constant values
+              // Post-processing (only when enabled)
               if (params.brightness.enabled || params.contrast.enabled || params.noise.enabled || 
-                  params.saturation.enabled || params.gamma.enabled || params.vignette.enabled) {
+                  params.saturation.enabled || params.gamma.enabled || params.vignette.enabled || params.pixelShift.enabled) {
                 try {
                   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                   const data = imageData.data;
-                  
                   for (let i = 0; i < data.length; i += 4) {
                     let r = data[i];
                     let g = data[i + 1];
                     let b = data[i + 2];
                     
-                    // Apply brightness and contrast using constant values
                     if (params.brightness.enabled || params.contrast.enabled) {
                       r = Math.max(0, Math.min(255, (r - 128) * constantEffects.contrast + 128 + constantEffects.brightness * 255));
                       g = Math.max(0, Math.min(255, (g - 128) * constantEffects.contrast + 128 + constantEffects.brightness * 255));
                       b = Math.max(0, Math.min(255, (b - 128) * constantEffects.contrast + 128 + constantEffects.brightness * 255));
                     }
-                    
-                    // Apply saturation using constant value
                     if (params.saturation.enabled) {
                       const gray = 0.299 * r + 0.587 * g + 0.114 * b;
                       r = gray + constantEffects.saturation * (r - gray);
@@ -436,61 +436,46 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
                       g = Math.max(0, Math.min(255, g));
                       b = Math.max(0, Math.min(255, b));
                     }
-                    
-                    // Apply gamma correction using constant value
                     if (params.gamma.enabled) {
                       r = Math.pow(r / 255, constantEffects.gamma) * 255;
                       g = Math.pow(g / 255, constantEffects.gamma) * 255;
                       b = Math.pow(b / 255, constantEffects.gamma) * 255;
                     }
-                    
-                    // Apply vignette effect using constant value
                     if (params.vignette.enabled) {
                       const x = (i / 4) % canvas.width;
                       const y = Math.floor((i / 4) / canvas.width);
                       const centerX = canvas.width / 2;
                       const centerY = canvas.height / 2;
-                      const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
-                      const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
+                      const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+                      const maxDistance = Math.sqrt(centerX ** 2 + centerY ** 2);
                       const vignette = 1 - (distance / maxDistance) * constantEffects.vignetteStrength;
-                      r *= vignette;
-                      g *= vignette;
-                      b *= vignette;
+                      r *= vignette; g *= vignette; b *= vignette;
                     }
-                    
-                    // Apply noise using constant value
                     if (params.noise.enabled) {
                       const noise = (Math.random() - 0.5) * constantEffects.noiseLevel * 255;
                       r = Math.max(0, Math.min(255, r + noise));
                       g = Math.max(0, Math.min(255, g + noise));
                       b = Math.max(0, Math.min(255, b + noise));
                     }
-                    
-                    // Apply pixel shift effects
                     if (params.pixelShift.enabled) {
-                      const shiftAmount = Math.random() * (params.pixelShift.max - params.pixelShift.min) + params.pixelShift.min;
-                      const shift = Math.floor(shiftAmount);
+                      const shift = Math.floor(Math.random() * (params.pixelShift.max - params.pixelShift.min) + params.pixelShift.min);
                       if (shift > 0 && i + shift * 4 < data.length) {
                         r = data[i + shift * 4];
                         g = data[i + shift * 4 + 1];
                         b = data[i + shift * 4 + 2];
                       }
                     }
-                    
-                    data[i] = r;
-                    data[i + 1] = g;
-                    data[i + 2] = b;
+                    data[i] = r; data[i + 1] = g; data[i + 2] = b;
                   }
-                  
                   ctx.putImageData(imageData, 0, 0);
-                } catch (error) {
-                  console.warn('Error applying post-processing effects:', error);
+                } catch (e) {
+                  console.warn('Post-processing error:', e);
                 }
               }
               
-              // Apply blurred border effect
-              if (params.blurredBorder.enabled) {
-                const borderSize = Math.random() * (params.blurredBorder.max - params.blurredBorder.min) + params.blurredBorder.min;
+              // Blurred border (constant per video)
+              if (params.blurredBorder.enabled && constantEffects.blurredBorderSize !== undefined) {
+                const borderSize = constantEffects.blurredBorderSize;
                 ctx.filter = `blur(${borderSize}px)`;
                 ctx.strokeStyle = 'transparent';
                 ctx.lineWidth = borderSize;
@@ -498,7 +483,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
                 ctx.filter = 'none';
               }
               
-              // Apply watermark if enabled
+              // Watermark
               if (params.watermark.enabled) {
                 ctx.globalAlpha = params.watermark.opacity;
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
@@ -510,28 +495,14 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
                 ctx.globalAlpha = 1;
               }
               
-              // Advance to next frame
-              const speed = params.speed.enabled ? 
-                Math.random() * (params.speed.max - params.speed.min) + params.speed.min : 1;
-              video.currentTime += (1/25) * speed; // 25 FPS
-              
-              // Continue rendering if within bounds
-              if (video.currentTime < endTime && frameCount < maxFrames) {
-                requestAnimationFrame(renderFrame);
-              } else {
-                // Ensure MediaRecorder stops properly
-                setTimeout(() => {
-                  if (mediaRecorder.state === 'recording') {
-                    console.log('Stopping MediaRecorder after completion');
-                    mediaRecorder.stop();
-                  }
-                }, 200); // Increased delay for stability
-              }
+              // Advance timeline with fixed step to preserve duration
+              const dt = 1 / targetFPS;
+              video.currentTime += dt;
             };
             
-            // Start rendering after a small delay
+            // Kick off interval-driven loop
             setTimeout(() => {
-              renderFrame();
+              intervalId = window.setInterval(renderFrame, frameInterval);
             }, 100);
             
           } catch (error) {
