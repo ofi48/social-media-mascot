@@ -1,70 +1,192 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProcessVideoTab } from "./ProcessVideoTab";
-import { ManagePresetsTab } from "./ManagePresetsTab";
+import { ProcessTab } from "./ProcessTab";
+import { PresetManager } from "./PresetManager";
 import { ResultsTab } from "./ResultsTab";
-import { VideoProcessingProvider, useVideoProcessingContext } from "./VideoProcessingProvider";
+import { VideoPreview } from "./VideoPreview";
+import { useVideoProcessing } from "@/hooks/useVideoProcessing";
+import { useVideoQueue } from "@/hooks/useVideoQueue";
+import { VideoPresetSettings, DEFAULT_PRESET } from "@/types/video-preset";
+import { toast } from 'sonner';
 
-const VideoRepurposerContent = () => {
+export const VideoRepurposer = () => {
   const [activeTab, setActiveTab] = useState("process");
-  const { singleProcessing, batchProcessing } = useVideoProcessingContext();
+  const [settings, setSettings] = useState<VideoPresetSettings>(DEFAULT_PRESET);
+  const [queueFiles, setQueueFiles] = useState<File[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewFileName, setPreviewFileName] = useState("");
 
-  // Don't auto-switch tabs - let user control navigation
+  // Single video processing
+  const {
+    uploadedFile,
+    uploadedFileUrl,
+    isProcessing,
+    progress,
+    results,
+    handleFileSelect,
+    processVideo,
+    resetResults
+  } = useVideoProcessing();
+
+  // Batch processing
+  const {
+    queue,
+    isProcessing: isBatchProcessing,
+    currentItem,
+    addVideosToQueue,
+    removeFromQueue,
+    clearQueue,
+    retryJob,
+    processBatch
+  } = useVideoQueue();
+
+  // Combine all results for the Results tab
+  const allResults = [
+    ...results,
+    ...queue.filter(job => job.status === 'completed').flatMap(job => job.results || [])
+  ];
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
   };
 
+  const handleFilesAdded = (files: File[]) => {
+    setQueueFiles(prev => [...prev, ...files]);
+  };
+
+  const handleFileRemoved = (index: number) => {
+    setQueueFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearFiles = () => {
+    setQueueFiles([]);
+  };
+
+  const handleStartBatch = (files: File[], batchSettings: VideoPresetSettings, copies: number) => {
+    addVideosToQueue(files, batchSettings, copies);
+    setQueueFiles([]); // Clear the file list after adding to queue
+    processBatch();
+  };
+
+  const handlePreview = (name: string, url: string) => {
+    setPreviewFileName(name);
+    setPreviewUrl(url);
+    setShowPreview(true);
+  };
+
+  const handleDownload = async (name: string, url: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(downloadUrl);
+      toast.success(`Downloaded ${name}`);
+    } catch (error) {
+      toast.error('Download failed');
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold text-foreground">Video Spoofer</h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          Genera múltiples variaciones únicas de tus videos con parámetros de procesamiento avanzados. 
-          Perfecto para creadores de contenido, especialistas en marketing y gestores de redes sociales.
-        </p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="text-center space-y-4 mb-8">
+            <h1 className="text-4xl font-bold text-foreground">Video Repurposer</h1>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Generate multiple unique video variants with randomized effects and transformations. 
+              Perfect for content creators, marketers, and social media managers.
+            </p>
+          </div>
+
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="process" className="flex items-center gap-2">
+                Process Video
+              </TabsTrigger>
+              <TabsTrigger value="presets" className="flex items-center gap-2">
+                Manage Presets
+              </TabsTrigger>
+              <TabsTrigger value="results" className="flex items-center gap-2">
+                Results
+                {allResults.length > 0 && (
+                  <span className="ml-1 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+                    {allResults.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="process" className="mt-6">
+              <ProcessTab
+                uploadedFile={uploadedFile}
+                uploadedFileUrl={uploadedFileUrl}
+                processing={isProcessing}
+                progress={progress}
+                numCopies={3}
+                setNumCopies={() => {}}
+                settings={settings}
+                setSettings={setSettings}
+                handleFileSelect={handleFileSelect}
+                handleStartProcess={() => processVideo(3, settings)}
+                queueFiles={queueFiles}
+                queue={queue}
+                isProcessing={isBatchProcessing}
+                currentItem={currentItem}
+                onFilesAdded={handleFilesAdded}
+                onFileRemoved={handleFileRemoved}
+                onClearFiles={handleClearFiles}
+                onRemoveFromQueue={removeFromQueue}
+                onRetryJob={retryJob}
+                onClearQueue={clearQueue}
+                onStartBatch={handleStartBatch}
+              />
+            </TabsContent>
+            
+            <TabsContent value="presets" className="mt-6">
+              <PresetManager
+                currentSettings={settings}
+                onLoadPreset={setSettings}
+              />
+            </TabsContent>
+            
+            <TabsContent value="results" className="mt-6">
+              <ResultsTab
+                results={allResults}
+                batchResults={queue.filter(job => job.status === 'completed')}
+                onPreview={handlePreview}
+                onDownload={handleDownload}
+                onClearResults={() => {
+                  resetResults();
+                  clearQueue();
+                }}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-
-      {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="process" className="flex items-center gap-2">
-            Procesar Video
-          </TabsTrigger>
-          <TabsTrigger value="presets" className="flex items-center gap-2">
-            Gestionar Presets
-          </TabsTrigger>
-          <TabsTrigger value="results" className="flex items-center gap-2">
-            Resultados
-            {(singleProcessing.results.length > 0 || batchProcessing.queue.filter(job => job.status === 'completed').length > 0) && (
-              <span className="ml-1 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
-                {singleProcessing.results.length + batchProcessing.queue.filter(job => job.status === 'completed').length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="process" className="mt-6">
-          <ProcessVideoTab />
-        </TabsContent>
-        
-        <TabsContent value="presets" className="mt-6">
-          <ManagePresetsTab />
-        </TabsContent>
-        
-        <TabsContent value="results" className="mt-6">
-          <ResultsTab />
-        </TabsContent>
-      </Tabs>
+      
+      {/* Video Preview Modal */}
+      {showPreview && (
+        <VideoPreview
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          videoUrl={previewUrl}
+          fileName={previewFileName}
+          onDownload={() => handleDownload(previewFileName, previewUrl)}
+        />
+      )}
     </div>
-  );
-};
-
-const VideoRepurposer = () => {
-  return (
-    <VideoProcessingProvider>
-      <VideoRepurposerContent />
-    </VideoProcessingProvider>
   );
 };
 

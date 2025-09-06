@@ -48,10 +48,10 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (50MB max to avoid memory issues)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    // Validate file size (100MB max)
+    const maxSize = 100 * 1024 * 1024; // 100MB
     if (videoFile.size > maxSize) {
-      throw new Error('File size exceeds 50MB limit');
+      throw new Error('File size exceeds 100MB limit');
     }
     
     const settings = JSON.parse(settingsStr);
@@ -125,36 +125,68 @@ async function createVideoVariations(
   const extension = videoFile.name.split('.').pop() || 'mp4';
   const timestamp = Date.now();
   
-  // Process each variation individually
-  for (let i = 0; i < numCopies; i++) {
-    try {
-      // Generate unique processing details for this variation
-      const processingDetails = generateProcessingDetails(settings, i);
-      
-      // Create unique filename for this variation
-      const variationName = `${originalName}_variation_${i + 1}_${timestamp}_${Math.random().toString(36).substr(2, 6)}.${extension}`;
-      const variationPath = `videos/${variationName}`;
-      
-      console.log(`[${requestId}] Creating variation ${i + 1}/${numCopies}: ${variationName}`);
+  try {
+    // First, upload the original video to get a stable URL
+    const originalPath = `source/${originalName}_${timestamp}.${extension}`;
+    console.log(`[${requestId}] Uploading original video to: ${originalPath}`);
+    
+    const { data: originalUpload, error: originalError } = await supabase.storage
+      .from('videos')
+      .upload(originalPath, videoFile, {
+        contentType: videoFile.type,
+        upsert: true
+      });
+    
+    if (originalError) {
+      console.error(`[${requestId}] Failed to upload original:`, originalError);
+      throw new Error(`Failed to upload video: ${originalError.message}`);
+    }
+    
+    console.log(`[${requestId}] Original video uploaded successfully`);
+    
+    // Process each variation by creating a copy
+    for (let i = 0; i < numCopies; i++) {
+      try {
+        // Generate unique processing details for this variation
+        const processingDetails = generateProcessingDetails(settings, i);
         
-        // Create variation by uploading the original file with a new name
-        // (Storage copy might not be available, so we re-upload)
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('processed-videos')
-          .upload(variationPath, videoFile, {
-            contentType: videoFile.type,
-            upsert: true
-          });
+        // Create unique filename for this variation
+        const variationName = `${originalName}_var${i + 1}_${timestamp}.${extension}`;
+        const variationPath = `processed/${variationName}`;
         
-        if (uploadError) {
-          console.error(`[${requestId}] Upload error for variation ${i + 1}:`, uploadError);
-          continue; // Skip this variation
+        console.log(`[${requestId}] Creating variation ${i + 1}/${numCopies}: ${variationName}`);
+        
+        // Create variation by copying the original file with new name
+        const { data: copyData, error: copyError } = await supabase.storage
+          .from('videos')
+          .copy(originalPath, variationPath);
+        
+        if (copyError) {
+          console.error(`[${requestId}] Copy failed, attempting direct upload for variation ${i + 1}:`, copyError);
+          
+          // Fallback: upload the file again
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('videos')
+            .upload(variationPath, videoFile, {
+              contentType: videoFile.type,
+              upsert: true
+            });
+          
+          if (uploadError) {
+            console.error(`[${requestId}] Upload fallback failed for variation ${i + 1}:`, uploadError);
+            continue; // Skip this variation
+          }
         }
         
         // Get public URL for the variation
         const { data: urlData } = supabase.storage
-          .from('processed-videos')
+          .from('videos')
           .getPublicUrl(variationPath);
+        
+        if (!urlData.publicUrl) {
+          console.error(`[${requestId}] Failed to get public URL for variation ${i + 1}`);
+          continue;
+        }
         
         results.push({
           name: variationName,
@@ -164,14 +196,27 @@ async function createVideoVariations(
         
         console.log(`[${requestId}] Successfully created variation ${i + 1}/${numCopies}`);
         
-        // Small delay to prevent overwhelming
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Small delay between variations
+        await new Promise(resolve => setTimeout(resolve, 300));
         
       } catch (error) {
         console.error(`[${requestId}] Error creating variation ${i + 1}:`, error);
         // Continue with other variations
       }
     }
+    
+    // Clean up original file after processing
+    try {
+      await supabase.storage.from('videos').remove([originalPath]);
+      console.log(`[${requestId}] Cleaned up original file`);
+    } catch (error) {
+      console.warn(`[${requestId}] Failed to clean up original file:`, error);
+    }
+    
+  } catch (error) {
+    console.error(`[${requestId}] Critical error in video processing:`, error);
+    throw error;
+  }
   
   console.log(`[${requestId}] Final results count: ${results.length}`);
   return results;
