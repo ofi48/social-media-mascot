@@ -134,11 +134,19 @@ async function simulateVideoProcessing(
 function generateMockProcessingDetails(settings: any, variationIndex: number): any {
   const details: any = {};
   
-  // Apply enabled settings with some variation
+  // Apply only enabled and functional settings
   if (settings.videoBitrate?.enabled) {
     details.videoBitrate = Math.floor(
       settings.videoBitrate.min + 
       (settings.videoBitrate.max - settings.videoBitrate.min) * 
+      Math.random()
+    );
+  }
+  
+  if (settings.frameRate?.enabled) {
+    details.frameRate = Math.floor(
+      settings.frameRate.min + 
+      (settings.frameRate.max - settings.frameRate.min) * 
       Math.random()
     );
   }
@@ -151,10 +159,42 @@ function generateMockProcessingDetails(settings: any, variationIndex: number): a
     ).toFixed(2));
   }
   
+  if (settings.contrast?.enabled) {
+    details.contrast = Number((
+      settings.contrast.min + 
+      (settings.contrast.max - settings.contrast.min) * 
+      Math.random()
+    ).toFixed(2));
+  }
+  
+  if (settings.brightness?.enabled) {
+    details.brightness = Number((
+      settings.brightness.min + 
+      (settings.brightness.max - settings.brightness.min) * 
+      Math.random()
+    ).toFixed(2));
+  }
+  
   if (settings.speed?.enabled) {
     details.speed = Number((
       settings.speed.min + 
       (settings.speed.max - settings.speed.min) * 
+      Math.random()
+    ).toFixed(2));
+  }
+  
+  if (settings.flipHorizontal?.enabled) {
+    details.flipHorizontal = Math.random() > 0.5;
+  }
+  
+  if (settings.pixelSize && settings.pixelSize !== "original") {
+    details.pixelSize = settings.pixelSize;
+  }
+  
+  if (settings.volume?.enabled) {
+    details.volume = Number((
+      settings.volume.min + 
+      (settings.volume.max - settings.volume.min) * 
       Math.random()
     ).toFixed(2));
   }

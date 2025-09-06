@@ -63,12 +63,10 @@ export function VideoProcessingPanel() {
       
       <CardContent>
         <Tabs defaultValue="quality" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="quality">Calidad</TabsTrigger>
             <TabsTrigger value="color">Color</TabsTrigger>
-            <TabsTrigger value="effects">Efectos</TabsTrigger>
             <TabsTrigger value="transform">Transformar</TabsTrigger>
-            <TabsTrigger value="special">Especial</TabsTrigger>
           </TabsList>
           
           {/* Quality Tab */}
@@ -115,47 +113,6 @@ export function VideoProcessingPanel() {
                 )}
               </div>
 
-              {/* Audio Bitrate */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="audioBitrate">Audio Bitrate (kbps)</Label>
-                  <Switch
-                    checked={settings.audioBitrate.enabled}
-                    onCheckedChange={(checked) => updateRangeValue('audioBitrate', 'enabled', checked)}
-                  />
-                </div>
-                {settings.audioBitrate.enabled && (
-                  <div className="space-y-2">
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                        <Slider
-                          value={[settings.audioBitrate.min]}
-                          onValueChange={([value]) => updateRangeValue('audioBitrate', 'min', value)}
-                          min={64}
-                          max={320}
-                          step={32}
-                          className="mt-1"
-                        />
-                        <span className="text-xs text-muted-foreground">{settings.audioBitrate.min} kbps</span>
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs text-muted-foreground">Máximo</Label>
-                        <Slider
-                          value={[settings.audioBitrate.max]}
-                          onValueChange={([value]) => updateRangeValue('audioBitrate', 'max', value)}
-                          min={64}
-                          max={320}
-                          step={32}
-                          className="mt-1"
-                        />
-                        <span className="text-xs text-muted-foreground">{settings.audioBitrate.max} kbps</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Frame Rate */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -174,7 +131,7 @@ export function VideoProcessingPanel() {
                           value={[settings.frameRate.min]}
                           onValueChange={([value]) => updateRangeValue('frameRate', 'min', value)}
                           min={15}
-                          max={60}
+                          max={30}
                           step={1}
                           className="mt-1"
                         />
@@ -186,7 +143,7 @@ export function VideoProcessingPanel() {
                           value={[settings.frameRate.max]}
                           onValueChange={([value]) => updateRangeValue('frameRate', 'max', value)}
                           min={15}
-                          max={60}
+                          max={30}
                           step={1}
                           className="mt-1"
                         />
@@ -319,145 +276,7 @@ export function VideoProcessingPanel() {
                 )}
               </div>
 
-              {/* Gamma */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Gamma</Label>
-                  <Switch
-                    checked={settings.gamma.enabled}
-                    onCheckedChange={(checked) => updateRangeValue('gamma', 'enabled', checked)}
-                  />
-                </div>
-                {settings.gamma.enabled && (
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                      <Slider
-                        value={[settings.gamma.min]}
-                        onValueChange={([value]) => updateRangeValue('gamma', 'min', value)}
-                        min={0.5}
-                        max={2.0}
-                        step={0.1}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.gamma.min.toFixed(1)}</span>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Máximo</Label>
-                      <Slider
-                        value={[settings.gamma.max]}
-                        onValueChange={([value]) => updateRangeValue('gamma', 'max', value)}
-                        min={0.5}
-                        max={2.0}
-                        step={0.1}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.gamma.max.toFixed(1)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
 
-          {/* Effects Tab */}
-          <TabsContent value="effects" className="space-y-6">
-            <div className="grid gap-6">
-              {/* Vignette */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Viñeta</Label>
-                  <Switch
-                    checked={settings.vignette.enabled}
-                    onCheckedChange={(checked) => updateSimpleValue('vignette', 'enabled', checked)}
-                  />
-                </div>
-                {settings.vignette.enabled && (
-                  <div>
-                    <Slider
-                      value={[settings.vignette.value]}
-                      onValueChange={([value]) => updateSimpleValue('vignette', 'value', value)}
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      className="mt-1"
-                    />
-                    <span className="text-xs text-muted-foreground">Intensidad: {settings.vignette.value.toFixed(1)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Noise */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Ruido</Label>
-                  <Switch
-                    checked={settings.noise.enabled}
-                    onCheckedChange={(checked) => updateSimpleValue('noise', 'enabled', checked)}
-                  />
-                </div>
-                {settings.noise.enabled && (
-                  <div>
-                    <Slider
-                      value={[settings.noise.value]}
-                      onValueChange={([value]) => updateSimpleValue('noise', 'value', value)}
-                      min={0}
-                      max={0.1}
-                      step={0.01}
-                      className="mt-1"
-                    />
-                    <span className="text-xs text-muted-foreground">Intensidad: {settings.noise.value.toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Waveform Shift */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Desplazamiento de Onda</Label>
-                  <Switch
-                    checked={settings.waveformShift.enabled}
-                    onCheckedChange={(checked) => updateSimpleValue('waveformShift', 'enabled', checked)}
-                  />
-                </div>
-                {settings.waveformShift.enabled && (
-                  <div>
-                    <Slider
-                      value={[settings.waveformShift.value]}
-                      onValueChange={([value]) => updateSimpleValue('waveformShift', 'value', value)}
-                      min={0}
-                      max={0.5}
-                      step={0.05}
-                      className="mt-1"
-                    />
-                    <span className="text-xs text-muted-foreground">Intensidad: {settings.waveformShift.value.toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Pixel Shift */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Desplazamiento de Píxeles</Label>
-                  <Switch
-                    checked={settings.pixelShift.enabled}
-                    onCheckedChange={(checked) => updateSimpleValue('pixelShift', 'enabled', checked)}
-                  />
-                </div>
-                {settings.pixelShift.enabled && (
-                  <div>
-                    <Slider
-                      value={[settings.pixelShift.value]}
-                      onValueChange={([value]) => updateSimpleValue('pixelShift', 'value', value)}
-                      min={0}
-                      max={5}
-                      step={1}
-                      className="mt-1"
-                    />
-                    <span className="text-xs text-muted-foreground">Píxeles: {settings.pixelShift.value}</span>
-                  </div>
-                )}
-              </div>
             </div>
           </TabsContent>
 
@@ -503,84 +322,6 @@ export function VideoProcessingPanel() {
                 )}
               </div>
 
-              {/* Zoom */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Zoom</Label>
-                  <Switch
-                    checked={settings.zoom.enabled}
-                    onCheckedChange={(checked) => updateRangeValue('zoom', 'enabled', checked)}
-                  />
-                </div>
-                {settings.zoom.enabled && (
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                      <Slider
-                        value={[settings.zoom.min]}
-                        onValueChange={([value]) => updateRangeValue('zoom', 'min', value)}
-                        min={0.8}
-                        max={1.5}
-                        step={0.05}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.zoom.min.toFixed(2)}x</span>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Máximo</Label>
-                      <Slider
-                        value={[settings.zoom.max]}
-                        onValueChange={([value]) => updateRangeValue('zoom', 'max', value)}
-                        min={0.8}
-                        max={1.5}
-                        step={0.05}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.zoom.max.toFixed(2)}x</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Rotation */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Rotación (grados)</Label>
-                  <Switch
-                    checked={settings.rotation.enabled}
-                    onCheckedChange={(checked) => updateRangeValue('rotation', 'enabled', checked)}
-                  />
-                </div>
-                {settings.rotation.enabled && (
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                      <Slider
-                        value={[settings.rotation.min]}
-                        onValueChange={([value]) => updateRangeValue('rotation', 'min', value)}
-                        min={-10}
-                        max={10}
-                        step={1}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.rotation.min}°</span>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Máximo</Label>
-                      <Slider
-                        value={[settings.rotation.max]}
-                        onValueChange={([value]) => updateRangeValue('rotation', 'max', value)}
-                        min={-10}
-                        max={10}
-                        step={1}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.rotation.max}°</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Flip Horizontal */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -610,21 +351,8 @@ export function VideoProcessingPanel() {
                     <SelectItem value="1366x768">WXGA (1366x768)</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={settings.randomPixelSize}
-                    onCheckedChange={(checked) => updateSettings({ randomPixelSize: checked })}
-                  />
-                  <Label className="text-sm">Tamaño aleatorio por variación</Label>
-                </div>
               </div>
-            </div>
-          </TabsContent>
 
-          {/* Special Tab */}
-          <TabsContent value="special" className="space-y-6">
-            <div className="grid gap-6">
               {/* Trim Start */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -703,45 +431,6 @@ export function VideoProcessingPanel() {
                 )}
               </div>
 
-              {/* Blurred Border */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Borde Difuminado (píxeles)</Label>
-                  <Switch
-                    checked={settings.blurredBorder.enabled}
-                    onCheckedChange={(checked) => updateRangeValue('blurredBorder', 'enabled', checked)}
-                  />
-                </div>
-                {settings.blurredBorder.enabled && (
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                      <Slider
-                        value={[settings.blurredBorder.min]}
-                        onValueChange={([value]) => updateRangeValue('blurredBorder', 'min', value)}
-                        min={5}
-                        max={50}
-                        step={5}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.blurredBorder.min}px</span>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Máximo</Label>
-                      <Slider
-                        value={[settings.blurredBorder.max]}
-                        onValueChange={([value]) => updateRangeValue('blurredBorder', 'max', value)}
-                        min={5}
-                        max={50}
-                        step={5}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-muted-foreground">{settings.blurredBorder.max}px</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Volume */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -776,128 +465,6 @@ export function VideoProcessingPanel() {
                         className="mt-1"
                       />
                       <span className="text-xs text-muted-foreground">{settings.volume.max.toFixed(1)}x</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* US Metadata */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Usar Metadatos US</Label>
-                  <Switch
-                    checked={settings.usMetadata}
-                    onCheckedChange={(checked) => updateSettings({ usMetadata: checked })}
-                  />
-                </div>
-              </div>
-
-              {/* Watermark */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Marca de Agua</Label>
-                  <Switch
-                    checked={settings.watermark.enabled}
-                    onCheckedChange={(checked) => 
-                      updateSettings({ 
-                        watermark: { 
-                          ...settings.watermark, 
-                          enabled: checked 
-                        } 
-                      })
-                    }
-                  />
-                </div>
-                {settings.watermark.enabled && (
-                  <div className="space-y-4">
-                    {/* Watermark Size */}
-                    <div>
-                      <Label className="text-sm">Tamaño (%)</Label>
-                      <div className="flex gap-4 mt-2">
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                          <Slider
-                            value={[settings.watermark.size.min]}
-                            onValueChange={([value]) => 
-                              updateSettings({
-                                watermark: {
-                                  ...settings.watermark,
-                                  size: { ...settings.watermark.size, min: value }
-                                }
-                              })
-                            }
-                            min={2}
-                            max={20}
-                            step={1}
-                            className="mt-1"
-                          />
-                          <span className="text-xs text-muted-foreground">{settings.watermark.size.min}%</span>
-                        </div>
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground">Máximo</Label>
-                          <Slider
-                            value={[settings.watermark.size.max]}
-                            onValueChange={([value]) => 
-                              updateSettings({
-                                watermark: {
-                                  ...settings.watermark,
-                                  size: { ...settings.watermark.size, max: value }
-                                }
-                              })
-                            }
-                            min={2}
-                            max={20}
-                            step={1}
-                            className="mt-1"
-                          />
-                          <span className="text-xs text-muted-foreground">{settings.watermark.size.max}%</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Watermark Opacity */}
-                    <div>
-                      <Label className="text-sm">Opacidad</Label>
-                      <div className="flex gap-4 mt-2">
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                          <Slider
-                            value={[settings.watermark.opacity.min]}
-                            onValueChange={([value]) => 
-                              updateSettings({
-                                watermark: {
-                                  ...settings.watermark,
-                                  opacity: { ...settings.watermark.opacity, min: value }
-                                }
-                              })
-                            }
-                            min={0.1}
-                            max={1.0}
-                            step={0.1}
-                            className="mt-1"
-                          />
-                          <span className="text-xs text-muted-foreground">{settings.watermark.opacity.min.toFixed(1)}</span>
-                        </div>
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground">Máximo</Label>
-                          <Slider
-                            value={[settings.watermark.opacity.max]}
-                            onValueChange={([value]) => 
-                              updateSettings({
-                                watermark: {
-                                  ...settings.watermark,
-                                  opacity: { ...settings.watermark.opacity, max: value }
-                                }
-                              })
-                            }
-                            min={0.1}
-                            max={1.0}
-                            step={0.1}
-                            className="mt-1"
-                          />
-                          <span className="text-xs text-muted-foreground">{settings.watermark.opacity.max.toFixed(1)}</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
