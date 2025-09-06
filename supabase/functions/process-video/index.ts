@@ -58,16 +58,20 @@ serve(async (req) => {
     const numCopies = parseInt(numCopiesStr);
     
     console.log(`[${requestId}] Processing ${numCopies} variations of video: ${videoFile.name}`);
+    console.log(`[${requestId}] Settings:`, settings);
     
     // Process video variations efficiently
     const results = await processVideoVariations(videoFile, settings, numCopies, requestId);
+    
+    console.log(`[${requestId}] Processing results:`, results);
+    console.log(`[${requestId}] Number of results:`, results.length);
     
     const response: ProcessVideoResponse = {
       success: true,
       results: results
     };
     
-    console.log(`[${requestId}] Processing completed successfully`);
+    console.log(`[${requestId}] Processing completed successfully with ${results.length} results`);
     
     return new Response(
       JSON.stringify(response),
@@ -131,12 +135,12 @@ async function processVideoVariations(
       console.log(`[${requestId}] Processing variation ${i + 1}/${numCopies}: ${processedFileName}`);
       
       // Read file as stream to avoid memory issues
-      const videoStream = videoFile.stream();
+      const videoBuffer = await videoFile.arrayBuffer();
       
-      // Upload the video stream directly to storage
+      // Upload the video buffer to storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('processed-videos')
-        .upload(filePath, videoStream, {
+        .upload(filePath, videoBuffer, {
           contentType: videoFile.type,
           upsert: true
         });
@@ -168,6 +172,9 @@ async function processVideoVariations(
       // Continue with other variations even if one fails
     }
   }
+  
+  console.log(`[${requestId}] Final results count: ${results.length}`);
+  console.log(`[${requestId}] Final results:`, results.map(r => ({ name: r.name, url: r.url })));
   
   return results;
 }

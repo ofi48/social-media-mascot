@@ -99,6 +99,8 @@ export function useVideoQueue(): UseVideoQueueReturn {
     });
 
     for (const job of waitingJobs) {
+      let progressInterval: NodeJS.Timeout | null = null;
+      
       try {
         // Update job status to processing
         setQueue(prev => prev.map(j => 
@@ -111,7 +113,7 @@ export function useVideoQueue(): UseVideoQueueReturn {
         const parameters = generateProcessingParameters(settings, variationsPerVideo);
 
         // Simulate progress updates
-        const progressInterval = setInterval(() => {
+        progressInterval = setInterval(() => {
           setQueue(prev => prev.map(j => 
             j.id === job.id 
               ? { ...j, progress: Math.min(j.progress + Math.random() * 20, 90) }
@@ -130,22 +132,31 @@ export function useVideoQueue(): UseVideoQueueReturn {
           body: formData,
         });
 
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+
         if (error) {
           throw new Error(error.message || 'Edge function error');
         }
 
         const result = data;
+        
+        console.log('Batch processing result:', result);
 
         if (!result.success) {
           throw new Error(result.error || 'Processing failed');
         }
 
         // Map results with generated parameters
-        const processedResults = result.results.map((res: any, index: number) => ({
+        const processedResults = (result.results || []).map((res: any, index: number) => ({
           name: res.name,
           url: res.url,
           processingDetails: parameters[index] || {}
         }));
+        
+        console.log('Batch processed results:', processedResults);
 
         // Update job as completed
         setQueue(prev => prev.map(j => 
@@ -166,6 +177,11 @@ export function useVideoQueue(): UseVideoQueueReturn {
         });
 
       } catch (error) {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
         // Update job as failed

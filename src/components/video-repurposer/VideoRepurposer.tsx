@@ -9,21 +9,10 @@ const VideoRepurposerContent = () => {
   const [activeTab, setActiveTab] = useState("process");
   const { singleProcessing, batchProcessing } = useVideoProcessingContext();
 
-  // Auto-switch to results tab when processing completes
+  // Don't auto-switch tabs - let user control navigation
   const handleTabChange = (value: string) => {
     setActiveTab(value);
   };
-
-  // Switch to results tab when single processing completes successfully
-  if (singleProcessing.results.length > 0 && activeTab === "process") {
-    setTimeout(() => setActiveTab("results"), 500);
-  }
-
-  // Switch to results tab when batch processing has completed items
-  const completedBatchJobs = batchProcessing.queue.filter(job => job.status === 'completed');
-  if (completedBatchJobs.length > 0 && activeTab === "process") {
-    setTimeout(() => setActiveTab("results"), 500);
-  }
 
   return (
     <div className="space-y-6">
@@ -47,9 +36,9 @@ const VideoRepurposerContent = () => {
           </TabsTrigger>
           <TabsTrigger value="results" className="flex items-center gap-2">
             Resultados
-            {(singleProcessing.results.length > 0 || completedBatchJobs.length > 0) && (
+            {(singleProcessing.results.length > 0 || batchProcessing.queue.filter(job => job.status === 'completed').length > 0) && (
               <span className="ml-1 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
-                {singleProcessing.results.length + completedBatchJobs.length}
+                {singleProcessing.results.length + batchProcessing.queue.filter(job => job.status === 'completed').length}
               </span>
             )}
           </TabsTrigger>

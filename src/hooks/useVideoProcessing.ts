@@ -90,14 +90,19 @@ export function useVideoProcessing(): UseVideoProcessingReturn {
         throw new Error(response.error || 'Processing failed');
       }
 
+      console.log('Edge function response:', response);
+      console.log('Response results:', response.results);
+
       // Map results with generated parameters
-      const processedResults: VideoProcessingResult[] = response.results.map(
+      const processedResults: VideoProcessingResult[] = (response.results || []).map(
         (result: any, index: number) => ({
           name: result.name,
           url: result.url,
           processingDetails: parameters[index] || {}
         })
       );
+
+      console.log('Processed results:', processedResults);
 
       setResults(processedResults);
       setProgress(100);
