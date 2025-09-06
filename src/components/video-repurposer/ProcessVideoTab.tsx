@@ -1,11 +1,9 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { VideoUpload } from "./VideoUpload";
-import { VideoProcessingPanel } from "./VideoProcessingPanel";
 import { VideoQueue } from "./VideoQueue";
 import { SingleVideoProcessor } from "./SingleVideoProcessor";
 import { useVideoProcessingContext } from "./VideoProcessingProvider";
+import { VideoProcessingPanel } from "./VideoProcessingPanel";
 
 export function ProcessVideoTab() {
   const { processingMode, setProcessingMode } = useVideoProcessingContext();

@@ -13,10 +13,10 @@ const VideoRepurposer = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">Video Repurposer</h1>
+          <h1 className="text-4xl font-bold text-foreground">Video Spoofer</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Generate multiple unique variations of your videos with advanced processing parameters. 
-            Perfect for content creators, marketers, and social media managers.
+            Genera múltiples variaciones únicas de tus videos con parámetros de procesamiento avanzados. 
+            Perfecto para creadores de contenido, especialistas en marketing y gestores de redes sociales.
           </p>
         </div>
 
