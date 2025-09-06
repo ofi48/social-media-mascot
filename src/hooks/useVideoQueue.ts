@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { VideoProcessingJob, VideoPresetSettings } from '@/types/video-preset';
 import { generateProcessingParameters, safeLog } from '@/utils/videoProcessing';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UseVideoQueueReturn {
   queue: VideoProcessingJob[];
@@ -124,19 +125,16 @@ export function useVideoQueue(): UseVideoQueueReturn {
         formData.append('settings', JSON.stringify(settings));
         formData.append('numCopies', variationsPerVideo.toString());
 
-        // Call processing endpoint
-        const response = await fetch('/functions/v1/process-video', {
-          method: 'POST',
+        // Call processing endpoint via Supabase client
+        const { data, error } = await supabase.functions.invoke('process-video', {
           body: formData,
         });
 
-        clearInterval(progressInterval);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (error) {
+          throw new Error(error.message || 'Edge function error');
         }
 
-        const result = await response.json();
+        const result = data;
 
         if (!result.success) {
           throw new Error(result.error || 'Processing failed');

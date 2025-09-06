@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { VideoProcessingResult, ProcessingParameters, VideoPresetSettings, VideoMetadata } from '@/types/video-preset';
 import { generateProcessingParameters, analyzeVideoMetadata, safeLog } from '@/utils/videoProcessing';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UseVideoProcessingReturn {
   isProcessing: boolean;
@@ -72,23 +73,15 @@ export function useVideoProcessing(): UseVideoProcessingReturn {
       formData.append('settings', JSON.stringify(settings));
       formData.append('numCopies', numCopies.toString());
 
-      // Call Supabase Edge Function with retry logic
+      // Call Supabase Edge Function with retry logic (via Supabase client)
       const response = await callWithRetry(async () => {
-        const res = await fetch('/functions/v1/process-video', {
-          method: 'POST',
+        const { data, error } = await supabase.functions.invoke('process-video', {
           body: formData,
         });
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        if (error) {
+          throw new Error(error.message || 'Edge function error');
         }
-
-        const contentType = res.headers.get('content-type');
-        if (!contentType?.includes('application/json')) {
-          throw new Error('Server returned non-JSON response');
-        }
-
-        return res.json();
+        return data;
       }, 3);
 
       clearInterval(progressInterval);
