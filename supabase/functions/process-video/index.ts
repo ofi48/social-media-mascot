@@ -116,8 +116,15 @@ async function simulateVideoProcessing(
     // Generate mock processing details
     const processingDetails = generateMockProcessingDetails(settings, i);
     
-    // In production, this would be the actual processed video URL from your storage
-    const mockUrl = `https://example.com/processed-videos/${requestId}-variation-${i + 1}.mp4`;
+    // Use sample videos for demo purposes (these are actual working video URLs)
+    const demoVideos = [
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    ];
+    const mockUrl = demoVideos[i % demoVideos.length];
     
     results.push({
       name: `${videoFile.name.split('.')[0]}_variation_${i + 1}.mp4`,
