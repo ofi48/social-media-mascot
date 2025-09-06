@@ -22,7 +22,7 @@ export function SingleVideoProcessor({ settings }: SingleVideoProcessorProps) {
   const handleFileSelect = (files: File[]) => {
     if (files.length > 0) {
       setSelectedFile(files[0]);
-      singleProcessing.analyzeFile(files[0]);
+      singleProcessing.handleFileSelect(files[0]);
     }
   };
 
