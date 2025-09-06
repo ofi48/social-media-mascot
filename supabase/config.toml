@@ -1,1 +1,7 @@
 project_id = "feamafjxyjhhniestcyp"
+
+[functions.process-video]
+verify_jwt = false
+
+[functions.check-job-status]
+verify_jwt = false

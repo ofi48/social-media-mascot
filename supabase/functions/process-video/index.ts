@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<any>): void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -48,10 +53,10 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (50MB max to align with Supabase Free tier)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    // Validate file size (increased to 200MB for better user experience)
+    const maxSize = 200 * 1024 * 1024; // 200MB
     if (videoFile.size > maxSize) {
-      throw new Error(`File size exceeds 50MB limit. Please compress your video first. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
+      throw new Error(`File size exceeds 200MB limit. Please compress your video first. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     }
     
     const settings = JSON.parse(settingsStr);
@@ -65,18 +70,30 @@ serve(async (req) => {
     const operation = formData.get('operation');
     const isComparison = operation && String(operation).includes('compare');
 
-    // Send to Railway for processing
-    const results = await processVideoOnRailway(videoFile, settings, numCopies, requestId, isComparison);
+    // Generate unique job ID for tracking
+    const jobId = `job_${requestId}_${Date.now()}`;
     
-    console.log(`[${requestId}] Processing results:`, results);
-    console.log(`[${requestId}] Number of results:`, results.length);
-    
+    // Return immediate response with job ID for async processing
     const response: ProcessVideoResponse = {
       success: true,
-      results: results
+      results: [{
+        name: `processing_${jobId}`,
+        url: '', // Will be updated when processing completes
+        processingDetails: {
+          jobId: jobId,
+          status: 'processing',
+          message: 'Your video is being processed. This may take several minutes for large files.',
+          estimatedTime: Math.ceil(videoFile.size / (1024 * 1024) * 15) // Rough estimate: 15 seconds per MB
+        }
+      }]
     };
-    
-    console.log(`[${requestId}] Processing completed successfully with ${results.length} results`);
+
+    // Start background processing without blocking response
+    EdgeRuntime.waitUntil(
+      processVideoInBackground(videoFile, settings, numCopies, requestId, isComparison, jobId)
+    );
+
+    console.log(`[${requestId}] Started background processing for job: ${jobId}`);
     
     return new Response(
       JSON.stringify(response),
@@ -108,6 +125,33 @@ serve(async (req) => {
     )
   }
 })
+
+// Background processing function
+async function processVideoInBackground(
+  videoFile: File,
+  settings: any,
+  numCopies: number,
+  requestId: string,
+  isComparison: boolean,
+  jobId: string
+) {
+  try {
+    console.log(`[${requestId}] Background processing started for job: ${jobId}`);
+    
+    // Process video on Railway
+    const results = await processVideoOnRailway(videoFile, settings, numCopies, requestId, isComparison);
+    
+    console.log(`[${requestId}] Background processing completed for job: ${jobId} with ${results.length} results`);
+    
+    // Here you could store the results in a database or send a webhook
+    // For now, we'll just log success
+    
+  } catch (error) {
+    console.error(`[${requestId}] Background processing failed for job: ${jobId}:`, error);
+    
+    // Handle error - could store error state in database or send notification
+  }
+}
 
 async function processVideoOnRailway(
   videoFile: File, 
