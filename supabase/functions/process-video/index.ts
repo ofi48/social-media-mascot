@@ -48,10 +48,10 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (100MB max)
-    const maxSize = 100 * 1024 * 1024; // 100MB
+    // Validate file size (50MB max for Supabase free tier)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (videoFile.size > maxSize) {
-      throw new Error('File size exceeds 100MB limit');
+      throw new Error(`File size exceeds 50MB limit. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     }
     
     const settings = JSON.parse(settingsStr);
