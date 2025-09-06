@@ -35,7 +35,10 @@ export function ProcessVideoTab() {
         </CardHeader>
         <CardContent>
           <VideoUpload
-            onFilesSelected={setSelectedFiles}
+            onFilesSelected={(files) => {
+              console.log('Files selected:', files.map(f => ({ name: f.name, size: f.size })));
+              setSelectedFiles(files);
+            }}
             multiple={true}
             disabled={isProcessing}
             maxSize={100 * 1024 * 1024} // 100MB

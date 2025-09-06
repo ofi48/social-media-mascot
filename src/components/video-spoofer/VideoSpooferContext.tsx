@@ -159,8 +159,8 @@ export function VideoSpooferProvider({ children }: { children: React.ReactNode }
           continue;
         }
 
-        setProcessingProgress((i / selectedFiles.length) * 50);
-
+        console.log(`Processing file ${i + 1}/${selectedFiles.length}: ${file.name}`);
+        
         // Call Supabase edge function
         const formData = new FormData();
         formData.append('video', file);
@@ -168,14 +168,33 @@ export function VideoSpooferProvider({ children }: { children: React.ReactNode }
         formData.append('numCopies', numVariations.toString());
         formData.append('operation', 'video-spoofer');
 
+        console.log('Calling Supabase function with:', {
+          fileName: file.name,
+          fileSize: file.size,
+          numVariations,
+          enabledParams: Object.keys(settings).filter(key => 
+            typeof settings[key] === 'object' && settings[key].enabled
+          )
+        });
+
         const { data, error } = await supabase.functions.invoke('process-video', {
           body: formData,
         });
 
+        console.log('Supabase response:', { data, error });
+
         if (error) {
+          console.error('Supabase edge function error:', error);
           throw new Error(error.message);
         }
 
+        if (!data || !data.jobId) {
+          console.error('No job ID returned from Supabase');
+          throw new Error('No job ID returned from processing service');
+        }
+
+        console.log('Job created with ID:', data.jobId);
+        
         if (data.jobId) {
           setCurrentJobId(data.jobId);
           
@@ -190,15 +209,30 @@ export function VideoSpooferProvider({ children }: { children: React.ReactNode }
               body: { jobId: data.jobId }
             });
 
+            console.log(`Status check attempt ${attempts + 1}:`, { statusData, statusError });
+
             if (statusError) {
               console.error('Status check error:', statusError);
               break;
             }
 
+            if (!statusData) {
+              console.error('No status data returned');
+              break;
+            }
+
+            console.log('Job status:', statusData.status);
+
             if (statusData.status === 'completed') {
-              allResults.push(...statusData.results);
+              console.log('Job completed, results:', statusData.results);
+              if (statusData.results && statusData.results.length > 0) {
+                allResults.push(...statusData.results);
+              } else {
+                console.warn('Job completed but no results found');
+              }
               break;
             } else if (statusData.status === 'failed') {
+              console.error('Job failed:', statusData.errorMessage);
               throw new Error(statusData.errorMessage || 'Processing failed');
             }
             
@@ -208,13 +242,24 @@ export function VideoSpooferProvider({ children }: { children: React.ReactNode }
         }
       }
 
-      setResults(allResults);
-      setProcessingProgress(100);
+      console.log('All processing completed. Total results:', allResults.length);
+      
+      if (allResults.length === 0) {
+        console.warn('No results were generated from processing');
+        toast({
+          title: "No results generated",
+          description: "The processing completed but no variations were created. Check the console for more details.",
+          variant: "destructive",
+        });
+      } else {
+        setResults(allResults);
+        setProcessingProgress(100);
 
-      toast({
-        title: "Processing complete",
-        description: `Successfully processed ${allResults.length} video variations.`,
-      });
+        toast({
+          title: "Processing complete", 
+          description: `Successfully processed ${allResults.length} video variations.`,
+        });
+      }
 
     } catch (error) {
       console.error('Processing error:', error);

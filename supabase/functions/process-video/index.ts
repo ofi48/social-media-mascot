@@ -43,6 +43,12 @@ serve(async (req) => {
     const videoFile = formData.get('video') as File;
     const settingsStr = formData.get('settings') as string;
     const numCopiesStr = formData.get('numCopies') as string;
+    const operation = formData.get('operation') as string || 'default';
+    
+    console.log(`[${requestId}] Operation type: ${operation}`);
+    console.log(`[${requestId}] File: ${videoFile?.name}, Size: ${videoFile?.size}`);
+    console.log(`[${requestId}] Settings: ${settingsStr}`);
+    console.log(`[${requestId}] NumCopies: ${numCopiesStr}`);
     
     if (!videoFile || !settingsStr || !numCopiesStr) {
       throw new Error('Missing required fields: video, settings, or numCopies');
@@ -98,18 +104,18 @@ serve(async (req) => {
     }
     
     // Return immediate response with job ID for async processing
-    const response: ProcessVideoResponse = {
+    const response = {
       success: true,
-      results: [{
-        name: `processing_${jobId}`,
-        url: '', // Will be updated when processing completes
-        processingDetails: {
-          jobId: jobId,
-          status: 'processing',
-          message: 'Your video is being processed. Check back in a few minutes.',
-          estimatedTime: Math.ceil(videoFile.size / (1024 * 1024) * 10) // 10 seconds per MB estimate
-        }
-      }]
+      jobId: jobId,
+      status: 'processing',
+      message: `Video processing started for ${videoFile.name}. Check status with the job ID.`,
+      estimatedTimeMinutes: Math.ceil(numCopies * 2), // Rough estimate
+      processingDetails: {
+        filename: videoFile.name,
+        fileSize: `${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`,
+        variations: numCopies,
+        operation: operation || 'default'
+      }
     };
 
     // Start background processing without blocking response
