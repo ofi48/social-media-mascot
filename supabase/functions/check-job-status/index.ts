@@ -15,7 +15,17 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const jobId = url.searchParams.get('jobId');
+    let jobId = url.searchParams.get('jobId');
+
+    // Also support POST with JSON body
+    if (!jobId && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        jobId = body?.jobId || null;
+      } catch (_) {
+        // ignore JSON parse errors
+      }
+    }
     
     if (!jobId) {
       return new Response(

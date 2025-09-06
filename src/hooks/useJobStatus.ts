@@ -31,22 +31,18 @@ export function useJobStatus(jobId: string | null) {
 
     try {
       const { data, error: supabaseError } = await supabase.functions.invoke('check-job-status', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: new URLSearchParams({ jobId })
+        body: { jobId }
       });
 
       if (supabaseError) {
         throw new Error(supabaseError.message);
       }
 
-      if (data.error) {
-        throw new Error(data.error);
+      if ((data as any)?.error) {
+        throw new Error((data as any).error);
       }
 
-      setJobStatus(data);
+      setJobStatus(data as unknown as JobStatus);
     } catch (err) {
       console.error('Error checking job status:', err);
       setError(err instanceof Error ? err.message : 'Failed to check job status');

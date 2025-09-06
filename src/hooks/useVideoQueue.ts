@@ -214,14 +214,38 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
 
         const results = response.data.results || [];
 
-        // Validate and normalize result URLs
-        const processedResults = results.map((result: any) => ({
-          name: result.name,
-          url: result.url.startsWith('http') 
-            ? result.url 
-            : `https://social-media-mascot-production.up.railway.app${result.url}`,
-          processingDetails: result.processingDetails
-        }));
+        // If background job pattern, poll until completed
+        let processedResults: any[] = [];
+        const first = results[0];
+        const jobId = first?.processingDetails?.jobId as string | undefined;
+
+        if (jobId) {
+          const start = Date.now();
+          const timeoutMs = 12 * 60 * 1000;
+          while (Date.now() - start < timeoutMs) {
+            const { data, error } = await supabase.functions.invoke('check-job-status', {
+              body: { jobId }
+            });
+            if (error) throw new Error(error.message);
+            if ((data as any)?.status === 'completed') {
+              processedResults = (data as any).results as any[];
+              break;
+            }
+            await new Promise(r => setTimeout(r, 8000));
+          }
+          if (processedResults.length === 0) {
+            throw new Error('Processing timed out. Please try a smaller or shorter video.');
+          }
+        } else {
+          // Validate and normalize result URLs (synchronous mode)
+          processedResults = results.map((result: any) => ({
+            name: result.name,
+            url: result.url.startsWith('http') 
+              ? result.url 
+              : `https://social-media-mascot-production.up.railway.app${result.url}`,
+            processingDetails: result.processingDetails
+          }));
+        }
 
         // Update item as completed
         setQueue(prev => prev.map(queueItem => 

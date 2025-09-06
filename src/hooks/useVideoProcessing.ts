@@ -118,22 +118,45 @@ export const useVideoProcessing = (): UseVideoProcessingReturn => {
       }
 
       const processedResults = response.data.results || [];
-      
-      // Map results with generated parameters
-      const resultsWithParams = processedResults.map((result: any, index: number) => ({
-        ...result,
-        processingDetails: processingParams[index] || result.processingDetails
-      }));
 
-      setResults(resultsWithParams);
+      // If background mode (initial URLs empty), start polling for real results
+      const first = processedResults[0];
+      const jobId = first?.processingDetails?.jobId as string | undefined;
+
+      if (jobId) {
+        // Poll check-job-status until completed or timeout
+        const start = Date.now();
+        const timeoutMs = 12 * 60 * 1000; // 12 minutes safety window
+        let lastStatus = 'processing';
+
+        while (Date.now() - start < timeoutMs) {
+          const { data, error } = await supabase.functions.invoke('check-job-status', {
+            body: { jobId }
+          });
+          if (error) throw new Error(error.message);
+          if ((data as any)?.status === 'completed') {
+            const realResults = (data as any).results as VideoProcessingResult[];
+            setResults(realResults);
+            setProgress(100);
+            toast.success(`Processing completed with ${realResults.length} videos`);
+            return;
+          }
+          lastStatus = (data as any)?.status || lastStatus;
+          await new Promise(r => setTimeout(r, 8000));
+        }
+        throw new Error('Processing timed out. Please try a smaller or shorter video.');
+      }
+
+      // Fallback (synchronous results)
+      setResults(processedResults);
       setProgress(100);
 
       safeLog('Video processing completed', {
-        resultCount: resultsWithParams.length,
-        results: resultsWithParams
+        resultCount: processedResults.length,
+        results: processedResults
       });
 
-      toast.success(`Successfully generated ${resultsWithParams.length} video variants`);
+      toast.success(`Successfully generated ${processedResults.length} video variants`);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
