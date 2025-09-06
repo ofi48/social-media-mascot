@@ -4,6 +4,7 @@ import { ProcessVideoTab } from "./ProcessVideoTab";
 import { PresetManager } from "./PresetManager";
 import { ResultsTab } from "./ResultsTab";
 import { VideoPreview } from "./VideoPreview";
+import { VideoProcessingProvider } from "./VideoProcessingProvider";
 import { useVideoProcessing } from "@/hooks/useVideoProcessing";
 import { useVideoQueue } from "@/hooks/useVideoQueue";
 import { VideoPresetSettings, DEFAULT_PRESET } from "@/types/video-preset";
@@ -96,7 +97,8 @@ export const VideoRepurposer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <VideoProcessingProvider>
+      <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -164,7 +166,8 @@ export const VideoRepurposer = () => {
           onDownload={() => handleDownload(previewFileName, previewUrl)}
         />
       )}
-    </div>
+      </div>
+    </VideoProcessingProvider>
   );
 };
 
