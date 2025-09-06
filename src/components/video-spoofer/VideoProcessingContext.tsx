@@ -340,7 +340,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               reject(new Error('MediaRecorder failed during recording'));
             };
             
-            // Generate constant effect values once for the entire video
+            // Generate constant effect values once for the entire video - only if enabled
             const constantEffects = {
               rotation: params.rotation.enabled ? 
                 Math.random() * (params.rotation.max - params.rotation.min) + params.rotation.min : 0,
@@ -357,7 +357,12 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               gamma: params.gamma.enabled ?
                 Math.random() * (params.gamma.max - params.gamma.min) + params.gamma.min : 1,
               vignetteStrength: params.vignette.enabled ?
-                Math.random() * (params.vignette.max - params.vignette.min) + params.vignette.min : 0
+                Math.random() * (params.vignette.max - params.vignette.min) + params.vignette.min : 0,
+              // Pre-calculate trim values
+              trimStart: params.trimStart.enabled ?
+                Math.random() * (params.trimStart.max - params.trimStart.min) + params.trimStart.min : 0,
+              trimEnd: params.trimEnd.enabled ?
+                Math.random() * (params.trimEnd.max - params.trimEnd.min) + params.trimEnd.min : 0
             };
             
             mediaRecorder.start();
