@@ -298,13 +298,19 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               videoBitrate = (Math.random() * (params.videoBitrate.max - params.videoBitrate.min) + params.videoBitrate.min) * 1000; // Convert to bps
             }
             
-            // Try MP4 first, then fallback to WebM
+            // Try MP4 first, then fallback to WebM with safer bitrate settings
             if (MediaRecorder.isTypeSupported('video/mp4')) {
-              mediaRecorder = new MediaRecorder(stream, { 
-                mimeType: 'video/mp4',
-                videoBitsPerSecond: videoBitrate
-              });
-              outputMimeType = 'video/mp4';
+              try {
+                mediaRecorder = new MediaRecorder(stream, { 
+                  mimeType: 'video/mp4',
+                  videoBitsPerSecond: Math.min(videoBitrate, 5000000) // Cap at 5 Mbps to prevent errors
+                });
+                outputMimeType = 'video/mp4';
+              } catch (error) {
+                console.log('MP4 with bitrate failed, trying without bitrate setting');
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
+                outputMimeType = 'video/mp4';
+              }
             } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
               mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
               outputMimeType = 'video/webm';
@@ -564,15 +570,8 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
           });
         } catch (error) {
           console.error(`Error processing variant ${i + 1}:`, error);
-          // Create fallback variant with original file
-          const blob = new Blob([file], { type: file.type });
-          
-          variants.push({
-            id: Math.random().toString(36).substr(2, 9),
-            filename: `${file.name.split('.')[0]}_variant_${i + 1}_fallback.${file.name.split('.').pop()}`,
-            blob: blob,
-            originalFile: file
-          });
+          console.error('Processing error details:', error.message);
+          // Skip failed variants instead of creating fallback
         } finally {
           // Update progress regardless of success/failure
           const pct = Math.round(((i + 1) / variations) * 100);
