@@ -17,11 +17,18 @@ app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '500mb' }));
 
-// Configure multer for file uploads
-const storage = multer.memoryStorage();
+// Configure multer for file uploads - use disk storage to save memory
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, './uploads')
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname)
+  }
+});
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit
+  limits: { fileSize: 100 * 1024 * 1024 } // Reduced to 100MB to avoid memory issues
 });
 
 // Ensure directories exist
@@ -41,6 +48,7 @@ app.post('/process-video', upload.single('video'), async (req, res) => {
   
   try {
     console.log(`[${requestId}] Processing video request started`);
+    console.log(`[${requestId}] Memory usage:`, process.memoryUsage());
     
     if (!req.file) {
       return res.status(400).json({ 
@@ -55,13 +63,9 @@ app.post('/process-video', upload.single('video'), async (req, res) => {
     console.log(`[${requestId}] Processing ${numCopies} variations`);
     console.log(`[${requestId}] File size: ${(req.file.size / (1024 * 1024)).toFixed(2)}MB`);
     
-    // Save uploaded file
-    const timestamp = Date.now();
-    const originalExt = path.extname(req.file.originalname) || '.mp4';
-    const inputPath = path.join(uploadsDir, `input_${requestId}_${timestamp}${originalExt}`);
-    
-    fs.writeFileSync(inputPath, req.file.buffer);
-    console.log(`[${requestId}] Input file saved: ${inputPath}`);
+    // File is already saved to disk by multer
+    const inputPath = req.file.path;
+    console.log(`[${requestId}] Input file at: ${inputPath}`);
     
     // Process video variations
     const results = await processVideoVariations(inputPath, settings, numCopies, requestId);
@@ -74,6 +78,12 @@ app.post('/process-video', upload.single('video'), async (req, res) => {
       console.warn(`[${requestId}] Failed to clean up input file:`, error.message);
     }
     
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+      console.log(`[${requestId}] Forced garbage collection`);
+    }
+    
     res.json({
       success: true,
       results: results,
@@ -81,9 +91,22 @@ app.post('/process-video', upload.single('video'), async (req, res) => {
     });
     
     console.log(`[${requestId}] Processing completed successfully with ${results.length} results`);
+    console.log(`[${requestId}] Final memory usage:`, process.memoryUsage());
     
   } catch (error) {
     console.error(`[${requestId}] Processing failed:`, error);
+    console.error(`[${requestId}] Memory usage on error:`, process.memoryUsage());
+    
+    // Clean up any temporary files on error
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`[${requestId}] Cleaned up file after error`);
+      } catch (cleanupError) {
+        console.error(`[${requestId}] Error cleaning up file:`, cleanupError);
+      }
+    }
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Video processing failed'
@@ -98,6 +121,7 @@ async function processVideoVariations(inputPath, settings, numCopies, requestId)
   for (let i = 0; i < numCopies; i++) {
     try {
       console.log(`[${requestId}] Processing variation ${i + 1}/${numCopies}`);
+      console.log(`[${requestId}] Memory before variation:`, process.memoryUsage());
       
       // Generate processing parameters for this variation
       const params = generateProcessingParameters(settings, i);
@@ -118,6 +142,10 @@ async function processVideoVariations(inputPath, settings, numCopies, requestId)
       
       results.push(result);
       console.log(`[${requestId}] Variation ${i + 1} completed: ${outputFileName}`);
+      console.log(`[${requestId}] Memory after variation:`, process.memoryUsage());
+      
+      // Small delay to allow memory cleanup between variations
+      await new Promise(resolve => setTimeout(resolve, 500));
       
     } catch (error) {
       console.error(`[${requestId}] Failed to process variation ${i + 1}:`, error);
@@ -186,11 +214,15 @@ function processWithFFmpeg(inputPath, outputPath, params, requestId) {
       command = command.fps(params.frameRate);
     }
     
-    // Output settings
+    // Output settings with memory optimization
     command
       .output(outputPath)
       .videoCodec('libx264')
       .audioCodec('aac')
+      .addOption('-preset', 'ultrafast') // Faster encoding, less memory usage
+      .addOption('-crf', '23') // Good quality balance
+      .addOption('-maxrate', '2000k') // Limit bitrate spikes
+      .addOption('-bufsize', '4000k') // Buffer size
       .format('mp4')
       .on('start', (commandLine) => {
         console.log(`[${requestId}] FFmpeg command: ${commandLine}`);
