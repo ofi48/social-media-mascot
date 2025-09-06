@@ -129,8 +129,8 @@ async function processVideoOnRailway(
     
     // Seleccionar endpoint
     const railwayUrl = isComparison 
-      ? "https://social-media-mascot.railway.internal/compare-media"
-      : "https://social-media-mascot.railway.internal/process-video";
+      ? "https://social-media-mascot-production.up.railway.app/compare-media"
+      : "https://social-media-mascot-production.up.railway.app/process-video";
     
     console.log(`[${requestId}] Sending request to Railway: ${railwayUrl}`);
     
@@ -217,7 +217,7 @@ async function uploadProcessedVideos(
       
       // Download the processed video from Railway
       const videoUrl = result.url.startsWith('/') 
-        ? `https://social-media-mascot.railway.internal${result.url}`
+        ? `https://social-media-mascot-production.up.railway.app${result.url}`
         : result.url;
       const videoResponse = await fetch(videoUrl);
       if (!videoResponse.ok) {

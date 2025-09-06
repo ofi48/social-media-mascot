@@ -219,7 +219,7 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
           name: result.name,
           url: result.url.startsWith('http') 
             ? result.url 
-            : `https://social-media-mascot.railway.internal${result.url}`,
+            : `https://social-media-mascot-production.up.railway.app${result.url}`,
           processingDetails: result.processingDetails
         }));
 
