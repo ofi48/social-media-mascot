@@ -48,10 +48,10 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (100MB max)
-    const maxSize = 100 * 1024 * 1024; // 100MB
+    // Validate file size (50MB max to avoid memory issues)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (videoFile.size > maxSize) {
-      throw new Error('File size exceeds 100MB limit');
+      throw new Error('File size exceeds 50MB limit');
     }
     
     const settings = JSON.parse(settingsStr);
@@ -60,8 +60,8 @@ serve(async (req) => {
     console.log(`[${requestId}] Processing ${numCopies} variations of video: ${videoFile.name}`);
     console.log(`[${requestId}] Settings:`, settings);
     
-    // Process video variations efficiently
-    const results = await processVideoVariations(videoFile, settings, numCopies, requestId);
+    // Process video variations efficiently - one at a time
+    const results = await createVideoVariations(videoFile, settings, numCopies, requestId);
     
     console.log(`[${requestId}] Processing results:`, results);
     console.log(`[${requestId}] Number of results:`, results.length);
@@ -104,7 +104,7 @@ serve(async (req) => {
   }
 })
 
-async function processVideoVariations(
+async function createVideoVariations(
   videoFile: File, 
   settings: any, 
   numCopies: number,
@@ -116,118 +116,149 @@ async function processVideoVariations(
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, supabaseKey)
   
-  console.log(`[${requestId}] Starting processing of ${numCopies} variations`);
+  console.log(`[${requestId}] Creating ${numCopies} video variations`);
   
   const results = [];
   
-  // Process each variation sequentially to avoid memory issues
-  for (let i = 0; i < numCopies; i++) {
-    try {
-      // Generate processing details for this variation
-      const processingDetails = generateMockProcessingDetails(settings, i);
-      
-      // Create a filename for the processed video
-      const originalName = videoFile.name.split('.')[0];
-      const extension = videoFile.name.split('.').pop() || 'mp4';
-      const processedFileName = `${originalName}_variation_${i + 1}_${Date.now()}.${extension}`;
-      const filePath = `videos/${processedFileName}`;
-      
-      console.log(`[${requestId}] Processing variation ${i + 1}/${numCopies}: ${processedFileName}`);
-      
-      // Read file as stream to avoid memory issues
-      const videoBuffer = await videoFile.arrayBuffer();
-      
-      // Upload the video buffer to storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('processed-videos')
-        .upload(filePath, videoBuffer, {
-          contentType: videoFile.type,
-          upsert: true
-        });
-      
-      if (uploadError) {
-        console.error(`[${requestId}] Upload error for variation ${i + 1}:`, uploadError);
-        throw new Error(`Failed to upload variation ${i + 1}: ${uploadError.message}`);
-      }
-      
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('processed-videos')
-        .getPublicUrl(filePath);
-      
-      results.push({
-        name: processedFileName,
-        url: urlData.publicUrl,
-        processingDetails: processingDetails,
-        filePath: filePath
+  // Get file info
+  const originalName = videoFile.name.split('.')[0];
+  const extension = videoFile.name.split('.').pop() || 'mp4';
+  const timestamp = Date.now();
+  
+  // First, upload the original video once
+  const originalPath = `videos/original_${originalName}_${timestamp}.${extension}`;
+  console.log(`[${requestId}] Uploading original video to: ${originalPath}`);
+  
+  try {
+    const { data: originalUpload, error: originalError } = await supabase.storage
+      .from('processed-videos')
+      .upload(originalPath, videoFile, {
+        contentType: videoFile.type,
+        upsert: true
       });
-      
-      console.log(`[${requestId}] Successfully processed variation ${i + 1}/${numCopies}`);
-      
-      // Small delay to prevent overwhelming the system
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-    } catch (error) {
-      console.error(`[${requestId}] Error processing variation ${i + 1}:`, error);
-      // Continue with other variations even if one fails
+    
+    if (originalError) {
+      console.error(`[${requestId}] Original upload error:`, originalError);
+      throw new Error(`Failed to upload original video: ${originalError.message}`);
     }
+    
+    // Get the original video URL
+    const { data: originalUrlData } = supabase.storage
+      .from('processed-videos')
+      .getPublicUrl(originalPath);
+    
+    console.log(`[${requestId}] Original video uploaded successfully: ${originalUrlData.publicUrl}`);
+    
+    // Create variations by copying the original with different names and processing details
+    for (let i = 0; i < numCopies; i++) {
+      try {
+        // Generate unique processing details for this variation
+        const processingDetails = generateProcessingDetails(settings, i);
+        
+        // Create unique filename for this variation
+        const variationName = `${originalName}_variation_${i + 1}_${timestamp}_${Math.random().toString(36).substr(2, 6)}.${extension}`;
+        const variationPath = `videos/${variationName}`;
+        
+        console.log(`[${requestId}] Creating variation ${i + 1}/${numCopies}: ${variationName}`);
+        
+        // Copy the original file to create a variation
+        const { data: copyData, error: copyError } = await supabase.storage
+          .from('processed-videos')
+          .copy(originalPath, variationPath);
+        
+        if (copyError) {
+          console.error(`[${requestId}] Copy error for variation ${i + 1}:`, copyError);
+          // If copy fails, upload the original file again with new name
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('processed-videos')
+            .upload(variationPath, videoFile, {
+              contentType: videoFile.type,
+              upsert: true
+            });
+          
+          if (uploadError) {
+            console.error(`[${requestId}] Upload error for variation ${i + 1}:`, uploadError);
+            continue; // Skip this variation
+          }
+        }
+        
+        // Get public URL for the variation
+        const { data: urlData } = supabase.storage
+          .from('processed-videos')
+          .getPublicUrl(variationPath);
+        
+        results.push({
+          name: variationName,
+          url: urlData.publicUrl,
+          processingDetails: processingDetails
+        });
+        
+        console.log(`[${requestId}] Successfully created variation ${i + 1}/${numCopies}`);
+        
+        // Small delay to prevent overwhelming
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+      } catch (error) {
+        console.error(`[${requestId}] Error creating variation ${i + 1}:`, error);
+        // Continue with other variations
+      }
+    }
+    
+  } catch (error) {
+    console.error(`[${requestId}] Error in variation creation:`, error);
+    throw error;
   }
   
   console.log(`[${requestId}] Final results count: ${results.length}`);
-  console.log(`[${requestId}] Final results:`, results.map(r => ({ name: r.name, url: r.url })));
-  
   return results;
 }
 
-function generateMockProcessingDetails(settings: any, variationIndex: number): any {
-  const details: any = {};
+function generateProcessingDetails(settings: any, variationIndex: number): any {
+  const details: any = {
+    variationIndex: variationIndex + 1,
+    processedAt: new Date().toISOString()
+  };
   
-  // Apply only enabled and functional settings
+  // Apply only enabled settings with random values within range
   if (settings.videoBitrate?.enabled) {
     details.videoBitrate = Math.floor(
       settings.videoBitrate.min + 
-      (settings.videoBitrate.max - settings.videoBitrate.min) * 
-      Math.random()
+      (settings.videoBitrate.max - settings.videoBitrate.min) * Math.random()
     );
   }
   
   if (settings.frameRate?.enabled) {
     details.frameRate = Math.floor(
       settings.frameRate.min + 
-      (settings.frameRate.max - settings.frameRate.min) * 
-      Math.random()
+      (settings.frameRate.max - settings.frameRate.min) * Math.random()
     );
   }
   
   if (settings.saturation?.enabled) {
     details.saturation = Number((
       settings.saturation.min + 
-      (settings.saturation.max - settings.saturation.min) * 
-      Math.random()
+      (settings.saturation.max - settings.saturation.min) * Math.random()
     ).toFixed(2));
   }
   
   if (settings.contrast?.enabled) {
     details.contrast = Number((
       settings.contrast.min + 
-      (settings.contrast.max - settings.contrast.min) * 
-      Math.random()
+      (settings.contrast.max - settings.contrast.min) * Math.random()
     ).toFixed(2));
   }
   
   if (settings.brightness?.enabled) {
     details.brightness = Number((
       settings.brightness.min + 
-      (settings.brightness.max - settings.brightness.min) * 
-      Math.random()
+      (settings.brightness.max - settings.brightness.min) * Math.random()
     ).toFixed(2));
   }
   
   if (settings.speed?.enabled) {
     details.speed = Number((
       settings.speed.min + 
-      (settings.speed.max - settings.speed.min) * 
-      Math.random()
+      (settings.speed.max - settings.speed.min) * Math.random()
     ).toFixed(2));
   }
   
@@ -242,14 +273,9 @@ function generateMockProcessingDetails(settings: any, variationIndex: number): a
   if (settings.volume?.enabled) {
     details.volume = Number((
       settings.volume.min + 
-      (settings.volume.max - settings.volume.min) * 
-      Math.random()
+      (settings.volume.max - settings.volume.min) * Math.random()
     ).toFixed(2));
   }
-  
-  // Add timestamp for tracking
-  details.processedAt = new Date().toISOString();
-  details.variationIndex = variationIndex;
   
   return details;
 }
