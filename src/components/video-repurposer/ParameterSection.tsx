@@ -169,6 +169,15 @@ export const ParameterSection: React.FC<ParameterSectionProps> = ({
                 max={3}
                 step={0.1}
               />
+              <RangeControl
+                label="Hue"
+                range={settings.hue}
+                onChange={(field, value) => updateRangeValue('hue', field, value)}
+                min={-180}
+                max={180}
+                step={1}
+                unit="°"
+              />
             </AccordionContent>
           </AccordionItem>
 
@@ -196,6 +205,31 @@ export const ParameterSection: React.FC<ParameterSectionProps> = ({
                 step={1}
               />
               <RangeControl
+                label="Blur"
+                range={settings.blur}
+                onChange={(field, value) => updateRangeValue('blur', field, value)}
+                min={0}
+                max={10}
+                step={0.1}
+                unit="px"
+              />
+              <RangeControl
+                label="Sharpness"
+                range={settings.sharpness}
+                onChange={(field, value) => updateRangeValue('sharpness', field, value)}
+                min={0}
+                max={5}
+                step={0.1}
+              />
+              <RangeControl
+                label="Chromakey"
+                range={settings.chromakey}
+                onChange={(field, value) => updateRangeValue('chromakey', field, value)}
+                min={0}
+                max={1}
+                step={0.1}
+              />
+              <RangeControl
                 label="Blurred Border"
                 range={settings.blurredBorder}
                 onChange={(field, value) => updateRangeValue('blurredBorder', field, value)}
@@ -203,6 +237,31 @@ export const ParameterSection: React.FC<ParameterSectionProps> = ({
                 max={20}
                 step={1}
                 unit="px"
+              />
+              <RangeControl
+                label="Stabilization"
+                range={settings.stabilization}
+                onChange={(field, value) => updateRangeValue('stabilization', field, value)}
+                min={0}
+                max={1}
+                step={0.1}
+              />
+              <RangeControl
+                label="Motion Blur"
+                range={settings.motionBlur}
+                onChange={(field, value) => updateRangeValue('motionBlur', field, value)}
+                min={0}
+                max={20}
+                step={1}
+              />
+              <RangeControl
+                label="Color Temperature"
+                range={settings.colorTemperature}
+                onChange={(field, value) => updateRangeValue('colorTemperature', field, value)}
+                min={2000}
+                max={8000}
+                step={100}
+                unit="K"
               />
             </AccordionContent>
           </AccordionItem>
@@ -288,6 +347,33 @@ export const ParameterSection: React.FC<ParameterSectionProps> = ({
                 max={2}
                 step={0.1}
                 unit="x"
+              />
+              <RangeControl
+                label="Audio Fade"
+                range={settings.audioFade}
+                onChange={(field, value) => updateRangeValue('audioFade', field, value)}
+                min={0}
+                max={5}
+                step={0.1}
+                unit="s"
+              />
+              <RangeControl
+                label="Highpass Filter"
+                range={settings.highpass}
+                onChange={(field, value) => updateRangeValue('highpass', field, value)}
+                min={50}
+                max={3000}
+                step={50}
+                unit="Hz"
+              />
+              <RangeControl
+                label="Lowpass Filter"
+                range={settings.lowpass}
+                onChange={(field, value) => updateRangeValue('lowpass', field, value)}
+                min={1000}
+                max={22000}
+                step={100}
+                unit="Hz"
               />
             </AccordionContent>
           </AccordionItem>

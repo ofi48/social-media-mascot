@@ -15,10 +15,14 @@ export interface VideoPresetSettings {
   contrast: RangeValue;
   brightness: RangeValue;
   gamma: RangeValue;
+  hue: RangeValue;
   
   // Efectos Visuales
   vignette: RangeValue;
   noise: RangeValue;
+  blur: RangeValue;
+  sharpness: RangeValue;
+  chromakey: RangeValue;
   waveformShift: RangeValue;
   pixelShift: RangeValue;
   
@@ -37,9 +41,15 @@ export interface VideoPresetSettings {
   // Características Especiales
   usMetadata: boolean;
   blurredBorder: RangeValue;
+  stabilization: RangeValue;
+  motionBlur: RangeValue;
+  colorTemperature: RangeValue;
   
   // Audio
   volume: RangeValue;
+  audioFade: RangeValue;
+  highpass: RangeValue;
+  lowpass: RangeValue;
   
   // Marca de Agua
   watermark: {
@@ -73,6 +83,14 @@ export interface ProcessingParameters {
   saturation?: number;
   contrast?: number;
   brightness?: number;
+  gamma?: number;
+  hue?: number;
+  blur?: number;
+  sharpness?: number;
+  chromakey?: number;
+  stabilization?: number;
+  motionBlur?: number;
+  colorTemperature?: number;
   speed?: number;
   zoom?: number;
   rotation?: number;
@@ -81,6 +99,9 @@ export interface ProcessingParameters {
   trimStart?: number;
   trimEnd?: number;
   volume?: number;
+  audioFade?: number;
+  highpass?: number;
+  lowpass?: number;
 }
 
 export interface VideoProcessingJob {
@@ -120,10 +141,14 @@ export const DEFAULT_PRESET: VideoPresetSettings = {
   contrast: { min: 0.9, max: 1.1, enabled: true },
   brightness: { min: -0.1, max: 0.1, enabled: true },
   gamma: { min: 0.9, max: 1.1, enabled: false },
+  hue: { min: -30, max: 30, enabled: false },
   
   // Efectos Visuales
   vignette: { min: 0, max: 0.3, enabled: false },
   noise: { min: 0, max: 0.05, enabled: false },
+  blur: { min: 0, max: 5, enabled: false },
+  sharpness: { min: 0, max: 2, enabled: false },
+  chromakey: { min: 0, max: 0.5, enabled: false },
   waveformShift: { min: 0, max: 2, enabled: false },
   pixelShift: { min: 0, max: 2, enabled: false },
   
@@ -142,9 +167,15 @@ export const DEFAULT_PRESET: VideoPresetSettings = {
   // Características Especiales
   usMetadata: false,
   blurredBorder: { min: 0, max: 30, enabled: false },
+  stabilization: { min: 0, max: 1, enabled: false },
+  motionBlur: { min: 0, max: 10, enabled: false },
+  colorTemperature: { min: 2000, max: 8000, enabled: false },
   
   // Audio
   volume: { min: 0.9, max: 1.1, enabled: false },
+  audioFade: { min: 0, max: 3, enabled: false },
+  highpass: { min: 100, max: 2000, enabled: false },
+  lowpass: { min: 2000, max: 20000, enabled: false },
   
   // Marca de Agua
   watermark: {

@@ -33,6 +33,32 @@ export function generateProcessingParameters(
     if (settings.brightness.enabled) {
       params.brightness = randomInRange(settings.brightness.min, settings.brightness.max, random);
     }
+    if (settings.gamma.enabled) {
+      params.gamma = randomInRange(settings.gamma.min, settings.gamma.max, random);
+    }
+    if (settings.hue.enabled) {
+      params.hue = randomInRange(settings.hue.min, settings.hue.max, random);
+    }
+    
+    // Visual effects
+    if (settings.blur.enabled) {
+      params.blur = randomInRange(settings.blur.min, settings.blur.max, random);
+    }
+    if (settings.sharpness.enabled) {
+      params.sharpness = randomInRange(settings.sharpness.min, settings.sharpness.max, random);
+    }
+    if (settings.chromakey.enabled) {
+      params.chromakey = randomInRange(settings.chromakey.min, settings.chromakey.max, random);
+    }
+    if (settings.stabilization.enabled) {
+      params.stabilization = randomInRange(settings.stabilization.min, settings.stabilization.max, random);
+    }
+    if (settings.motionBlur.enabled) {
+      params.motionBlur = randomInRange(settings.motionBlur.min, settings.motionBlur.max, random);
+    }
+    if (settings.colorTemperature.enabled) {
+      params.colorTemperature = randomInRange(settings.colorTemperature.min, settings.colorTemperature.max, random);
+    }
     
     // Transformations
     if (settings.speed.enabled) {
@@ -54,9 +80,18 @@ export function generateProcessingParameters(
       params.trimEnd = randomInRange(settings.trimEnd.min, settings.trimEnd.max, random);
     }
     
-    // Audio volume
+    // Audio volume and effects
     if (settings.volume.enabled) {
       params.volume = randomInRange(settings.volume.min, settings.volume.max, random);
+    }
+    if (settings.audioFade.enabled) {
+      params.audioFade = randomInRange(settings.audioFade.min, settings.audioFade.max, random);
+    }
+    if (settings.highpass.enabled) {
+      params.highpass = randomInRange(settings.highpass.min, settings.highpass.max, random);
+    }
+    if (settings.lowpass.enabled) {
+      params.lowpass = randomInRange(settings.lowpass.min, settings.lowpass.max, random);
     }
     
     parameters.push(params);
@@ -73,17 +108,57 @@ export function buildFilterGraph(params: ProcessingParameters, metadata: VideoMe
   let videoFilter = "[0:v]";
   let audioFilter = "[0:a]";
   
-  // Color adjustments (básicos y funcionales)
-  if (params.saturation || params.contrast || params.brightness) {
+  // Color adjustments (enhanced)
+  if (params.saturation || params.contrast || params.brightness || params.gamma) {
     const eqParams: string[] = [];
     if (params.saturation) eqParams.push(`saturation=${params.saturation}`);
     if (params.contrast) eqParams.push(`contrast=${params.contrast}`);
     if (params.brightness) eqParams.push(`brightness=${params.brightness}`);
+    if (params.gamma) eqParams.push(`gamma=${params.gamma}`);
     
     if (eqParams.length > 0) {
       filters.push(`${videoFilter}eq=${eqParams.join(':')}[v1]`);
       videoFilter = "[v1]";
     }
+  }
+  
+  // Hue adjustment
+  if (params.hue) {
+    filters.push(`${videoFilter}hue=h=${params.hue}[v2]`);
+    videoFilter = "[v2]";
+  }
+  
+  // Visual effects
+  if (params.blur) {
+    filters.push(`${videoFilter}boxblur=${params.blur}:${params.blur}[v3]`);
+    videoFilter = "[v3]";
+  }
+  
+  if (params.sharpness) {
+    filters.push(`${videoFilter}unsharp=5:5:${params.sharpness}:5:5:${params.sharpness}[v4]`);
+    videoFilter = "[v4]";
+  }
+  
+  if (params.chromakey) {
+    filters.push(`${videoFilter}chromakey=0x00ff00:${params.chromakey}:0.1[v5]`);
+    videoFilter = "[v5]";
+  }
+  
+  if (params.stabilization) {
+    filters.push(`${videoFilter}deshake=edge=mirror:blocksize=8:contrast=125:search=64[v6]`);
+    videoFilter = "[v6]";
+  }
+  
+  if (params.motionBlur) {
+    filters.push(`${videoFilter}mblur=${params.motionBlur}[v7]`);
+    videoFilter = "[v7]";
+  }
+  
+  if (params.colorTemperature) {
+    const r = params.colorTemperature > 5000 ? 1 : 1 + (5000 - params.colorTemperature) / 5000;
+    const b = params.colorTemperature < 5000 ? 1 : 1 + (params.colorTemperature - 5000) / 3000;
+    filters.push(`${videoFilter}colorbalance=rs=${r}:bs=${b}[v8]`);
+    videoFilter = "[v8]";
   }
   
   // Flip horizontal (funcional)
@@ -99,10 +174,25 @@ export function buildFilterGraph(params: ProcessingParameters, metadata: VideoMe
     videoFilter = "[v3]";
   }
   
-  // Audio volume (funcional)
+  // Audio effects (enhanced)
   if (params.volume && metadata.hasAudio) {
     filters.push(`${audioFilter}volume=${params.volume}[a1]`);
     audioFilter = "[a1]";
+  }
+  
+  if (params.audioFade && metadata.hasAudio) {
+    filters.push(`${audioFilter}afade=in:st=0:d=${params.audioFade},afade=out:st=${metadata.duration - params.audioFade}:d=${params.audioFade}[a2]`);
+    audioFilter = "[a2]";
+  }
+  
+  if (params.highpass && metadata.hasAudio) {
+    filters.push(`${audioFilter}highpass=f=${params.highpass}[a3]`);
+    audioFilter = "[a3]";
+  }
+  
+  if (params.lowpass && metadata.hasAudio) {
+    filters.push(`${audioFilter}lowpass=f=${params.lowpass}[a4]`);
+    audioFilter = "[a4]";
   }
   
   // Combine filters
