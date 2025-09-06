@@ -1,26 +1,45 @@
 import { useState, useCallback } from 'react';
-import { VideoProcessingResult, ProcessingParameters, VideoPresetSettings, VideoMetadata } from '@/types/video-preset';
+import { VideoProcessingResult, VideoPresetSettings, VideoMetadata } from '@/types/video-preset';
+import { supabase } from '@/integrations/supabase/client';
 import { generateProcessingParameters, analyzeVideoMetadata, safeLog } from '@/utils/videoProcessing';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface UseVideoProcessingReturn {
+  uploadedFile: File | null;
+  uploadedFileUrl: string;
   isProcessing: boolean;
   progress: number;
   results: VideoProcessingResult[];
   error: string | null;
   metadata: VideoMetadata | null;
-  processVideo: (file: File, settings: VideoPresetSettings, numCopies: number) => Promise<void>;
+  handleFileSelect: (file: File) => void;
+  processVideo: (numCopies: number, settings: VideoPresetSettings) => Promise<void>;
   resetResults: () => void;
   analyzeFile: (file: File) => Promise<void>;
 }
 
-export function useVideoProcessing(): UseVideoProcessingReturn {
+export const useVideoProcessing = (): UseVideoProcessingReturn => {
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<VideoProcessingResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    try {
+      setUploadedFile(file);
+      const url = URL.createObjectURL(file);
+      setUploadedFileUrl(url);
+      
+      await analyzeFile(file);
+      
+      toast.success(`File selected: ${file.name}`);
+    } catch (error) {
+      toast.error('Failed to load video file');
+    }
+  }, []);
 
   const analyzeFile = useCallback(async (file: File) => {
     try {
@@ -28,120 +47,131 @@ export function useVideoProcessing(): UseVideoProcessingReturn {
       const videoMetadata = await analyzeVideoMetadata(file);
       setMetadata(videoMetadata);
       safeLog('Video metadata analyzed', videoMetadata);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to analyze video';
-      setError(errorMessage);
-      toast.error(errorMessage);
+    } catch (error) {
+      console.error('Error analyzing file:', error);
+      setError('Failed to analyze video file');
     }
   }, []);
 
-  const processVideo = useCallback(async (
-    file: File, 
-    settings: VideoPresetSettings, 
-    numCopies: number
-  ) => {
+  const processVideo = useCallback(async (numCopies: number, settings: VideoPresetSettings) => {
+    if (!uploadedFile) {
+      setError('No file provided');
+      return;
+    }
+
     setIsProcessing(true);
     setProgress(0);
     setError(null);
     setResults([]);
 
     try {
-      safeLog('Starting video processing', { 
-        filename: file.name, 
-        numCopies, 
+      safeLog('Starting video processing', {
+        filename: uploadedFile.name,
+        numCopies,
         enabledSettings: Object.keys(settings).filter(key => {
           const setting = settings[key as keyof VideoPresetSettings];
-          return typeof setting === 'object' && setting !== null && 'enabled' in setting && setting.enabled;
+          return setting && typeof setting === 'object' && 'enabled' in setting && setting.enabled;
         })
       });
 
-      // Generate processing parameters
-      const parameters = generateProcessingParameters(settings, numCopies);
-      safeLog('Generated processing parameters', parameters);
+      // Generate processing parameters for each copy
+      const processingParams = Array.from({ length: numCopies }, (_, index) => 
+        generateProcessingParameters(settings, numCopies, index.toString())
+      );
+
+      safeLog('Generated processing parameters', processingParams);
 
       // Simulate progress updates
-      const progressInterval = setInterval(() => {
+      let progressInterval: NodeJS.Timeout | null = null;
+      progressInterval = setInterval(() => {
         setProgress(prev => {
           const newProgress = prev + Math.random() * 15;
-          return newProgress > 80 ? 80 : newProgress;
+          return newProgress >= 90 ? 90 : newProgress;
         });
-      }, 500);
+      }, 1000);
 
-      // Prepare form data
+      // Create FormData for the request
       const formData = new FormData();
-      formData.append('video', file);
+      formData.append('video', uploadedFile);
       formData.append('settings', JSON.stringify(settings));
       formData.append('numCopies', numCopies.toString());
 
-      // Call Supabase Edge Function with retry logic (via Supabase client)
+      // Call the edge function with retry logic
       const response = await callWithRetry(async () => {
-        const { data, error } = await supabase.functions.invoke('process-video', {
-          body: formData,
+        return await supabase.functions.invoke('process-video', {
+          body: formData
         });
-        if (error) {
-          throw new Error(error.message || 'Edge function error');
-        }
-        return data;
       }, 3);
 
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
 
-      if (!response.success) {
-        throw new Error(response.error || 'Processing failed');
+      if (response.error) {
+        throw new Error(response.error.message || 'Edge Function returned an error');
       }
 
-      console.log('Edge function response:', response);
-      console.log('Response results:', response.results);
+      if (!response.data) {
+        throw new Error('No data returned from processing');
+      }
 
-      // Map results with generated parameters
-      const processedResults: VideoProcessingResult[] = (response.results || []).map(
-        (result: any, index: number) => ({
-          name: result.name,
-          url: result.url,
-          processingDetails: parameters[index] || {}
-        })
-      );
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Processing failed');
+      }
 
-      console.log('Processed results:', processedResults);
-
-      setResults(processedResults);
-      setProgress(100);
+      const processedResults = response.data.results || [];
       
-      safeLog('Video processing completed', { 
-        resultCount: processedResults.length 
+      // Map results with generated parameters
+      const resultsWithParams = processedResults.map((result: any, index: number) => ({
+        ...result,
+        processingDetails: processingParams[index] || result.processingDetails
+      }));
+
+      setResults(resultsWithParams);
+      setProgress(100);
+
+      safeLog('Video processing completed', {
+        resultCount: resultsWithParams.length,
+        results: resultsWithParams
       });
 
-      toast.success(`¡Video procesado exitosamente! Se generaron ${numCopies} variación${numCopies > 1 ? 'es' : ''}.`);
+      toast.success(`Successfully generated ${resultsWithParams.length} video variants`);
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Processing failed';
+    } catch (error) {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setError(errorMessage);
-      setProgress(0);
       safeLog('Video processing failed', { error: errorMessage });
-      toast.error(`Error al procesar video: ${errorMessage}`);
+      toast.error(`Processing failed: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [uploadedFile]);
 
   const resetResults = useCallback(() => {
     setResults([]);
-    setError(null);
     setProgress(0);
+    setError(null);
     setMetadata(null);
+    setUploadedFile(null);
+    setUploadedFileUrl("");
   }, []);
 
   return {
+    uploadedFile,
+    uploadedFileUrl,
     isProcessing,
     progress,
     results,
     error,
     metadata,
+    handleFileSelect,
     processVideo,
     resetResults,
     analyzeFile
   };
-}
+};
 
 // Utility function for retry logic with exponential backoff
 async function callWithRetry<T>(

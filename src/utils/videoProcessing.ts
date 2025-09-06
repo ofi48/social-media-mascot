@@ -38,7 +38,7 @@ export function generateProcessingParameters(
     if (settings.speed.enabled) {
       params.speed = randomInRange(settings.speed.min, settings.speed.max, random);
     }
-    if (settings.flipHorizontal.enabled) {
+    if (settings.flipHorizontal) {
       params.flipHorizontal = random() > 0.5;
     }
     

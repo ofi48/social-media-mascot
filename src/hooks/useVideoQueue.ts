@@ -1,230 +1,195 @@
 import { useState, useCallback } from 'react';
-import { VideoProcessingJob, VideoPresetSettings } from '@/types/video-preset';
+import { QueueItem, VideoPresetSettings } from '@/types/video-preset';
+import { supabase } from '@/integrations/supabase/client';
 import { generateProcessingParameters, safeLog } from '@/utils/videoProcessing';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface UseVideoQueueReturn {
-  queue: VideoProcessingJob[];
+  queue: QueueItem[];
   isProcessing: boolean;
-  addToQueue: (files: File[]) => void;
+  currentItem: string | null;
+  addVideosToQueue: (files: File[], settings: VideoPresetSettings, numCopies: number) => QueueItem[];
   removeFromQueue: (jobId: string) => void;
   clearQueue: () => void;
   retryJob: (jobId: string) => void;
-  reorderQueue: (fromIndex: number, toIndex: number) => void;
-  processBatch: (settings: VideoPresetSettings, variationsPerVideo: number) => Promise<void>;
+  processBatch: () => Promise<void>;
 }
 
-export function useVideoQueue(): UseVideoQueueReturn {
-  const [queue, setQueue] = useState<VideoProcessingJob[]>([]);
+export const useVideoQueue = (): UseVideoQueueReturn => {
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentItem, setCurrentItem] = useState<string | null>(null);
 
-  const addToQueue = useCallback((files: File[]) => {
-    const newJobs: VideoProcessingJob[] = files.map(file => ({
+  const addVideosToQueue = useCallback((files: File[], settings: VideoPresetSettings, numCopies: number): QueueItem[] => {
+    const newItems: QueueItem[] = files.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      filename: file.name,
       file,
+      fileName: file.name,
+      fileSize: file.size,
       status: 'waiting',
-      progress: 0
+      progress: 0,
+      settings: { ...settings },
+      numCopies
     }));
 
-    setQueue(prev => [...prev, ...newJobs]);
-    safeLog('Added files to queue', { count: files.length });
-    toast.success(`Se añadieron ${files.length} video${files.length > 1 ? 's' : ''} a la cola`);
+    setQueue(prev => [...prev, ...newItems]);
+    return newItems;
   }, []);
 
   const removeFromQueue = useCallback((jobId: string) => {
-    setQueue(prev => {
-      const job = prev.find(j => j.id === jobId);
-      if (job?.status === 'processing') {
-        toast.error('Cannot remove job while processing');
-        return prev;
+    setQueue(prev => prev.filter(item => {
+      if (item.id === jobId && item.status === 'processing') {
+        return true; // Don't remove items currently being processed
       }
-      
-      const newQueue = prev.filter(j => j.id !== jobId);
-      safeLog('Removed job from queue', { jobId, filename: job?.filename });
-      return newQueue;
-    });
+      return item.id !== jobId;
+    }));
   }, []);
 
   const clearQueue = useCallback(() => {
-    const processingJobs = queue.filter(job => job.status === 'processing');
-    if (processingJobs.length > 0) {
-      toast.error('Cannot clear queue while jobs are processing');
+    if (isProcessing) {
+      toast.error('Cannot clear queue while processing');
       return;
     }
-
     setQueue([]);
-    safeLog('Cleared queue');
-    toast.success('Cola limpiada');
-  }, [queue]);
+  }, [isProcessing]);
 
   const retryJob = useCallback((jobId: string) => {
-    setQueue(prev => prev.map(job => 
-      job.id === jobId 
-        ? { ...job, status: 'waiting', progress: 0, errorMessage: undefined }
-        : job
+    setQueue(prev => prev.map(item => 
+      item.id === jobId 
+        ? { ...item, status: 'waiting' as const, progress: 0, error: undefined }
+        : item
     ));
-    safeLog('Retrying job', { jobId });
   }, []);
 
-  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
-    setQueue(prev => {
-      const newQueue = [...prev];
-      const [movedJob] = newQueue.splice(fromIndex, 1);
-      newQueue.splice(toIndex, 0, movedJob);
-      return newQueue;
-    });
-  }, []);
-
-  const processBatch = useCallback(async (
-    settings: VideoPresetSettings, 
-    variationsPerVideo: number
-  ) => {
+  const processBatch = useCallback(async () => {
     if (isProcessing) {
-      toast.error('Ya hay un procesamiento por lotes en progreso');
+      toast.error('Processing is already in progress');
       return;
     }
 
-    const waitingJobs = queue.filter(job => job.status === 'waiting');
-    if (waitingJobs.length === 0) {
-      toast.error('No hay videos en la cola para procesar');
+    const waitingItems = queue.filter(item => item.status === 'waiting');
+    if (waitingItems.length === 0) {
+      toast.info('No videos waiting to be processed');
       return;
     }
 
     setIsProcessing(true);
-    safeLog('Starting batch processing', { 
-      jobCount: waitingJobs.length, 
-      variationsPerVideo 
-    });
+    safeLog('Starting batch processing', { itemCount: waitingItems.length });
 
-    for (const job of waitingJobs) {
-      let progressInterval: NodeJS.Timeout | null = null;
-      
+    for (const item of waitingItems) {
       try {
-        // Update job status to processing
-        setQueue(prev => prev.map(j => 
-          j.id === job.id 
-            ? { ...j, status: 'processing', progress: 0 }
-            : j
+        setCurrentItem(item.id);
+        
+        // Update item status to processing
+        setQueue(prev => prev.map(queueItem => 
+          queueItem.id === item.id 
+            ? { ...queueItem, status: 'processing' as const, progress: 0 }
+            : queueItem
         ));
 
-        // Generate processing parameters
-        const parameters = generateProcessingParameters(settings, variationsPerVideo);
+        safeLog(`Processing item ${item.id}: ${item.fileName}`);
 
         // Simulate progress updates
+        let progressInterval: NodeJS.Timeout | null = null;
         progressInterval = setInterval(() => {
-          setQueue(prev => prev.map(j => 
-            j.id === job.id 
-              ? { ...j, progress: Math.min(j.progress + Math.random() * 20, 90) }
-              : j
+          setQueue(prev => prev.map(queueItem => 
+            queueItem.id === item.id 
+              ? { 
+                  ...queueItem, 
+                  progress: Math.min(queueItem.progress + Math.random() * 20, 90) 
+                }
+              : queueItem
           ));
         }, 1000);
 
-        // Prepare form data
+        // Create FormData for processing
         const formData = new FormData();
-        formData.append('video', job.file);
-        formData.append('settings', JSON.stringify(settings));
-        formData.append('numCopies', variationsPerVideo.toString());
+        formData.append('video', item.file);
+        formData.append('settings', JSON.stringify(item.settings));
+        formData.append('numCopies', (item.numCopies || 3).toString());
 
-        // Call processing endpoint via Supabase client
-        const { data, error } = await supabase.functions.invoke('process-video', {
-          body: formData,
+        // Call the processing function
+        const response = await supabase.functions.invoke('process-video', {
+          body: formData
         });
 
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          progressInterval = null;
+        if (progressInterval) clearInterval(progressInterval);
+
+        if (response.error) {
+          throw new Error(response.error.message || 'Processing failed');
         }
 
-        if (error) {
-          throw new Error(error.message || 'Edge function error');
+        if (!response.data?.success) {
+          throw new Error(response.data?.error || 'Processing failed');
         }
 
-        const result = data;
-        
-        console.log('Batch processing result:', result);
+        const results = response.data.results || [];
 
-        if (!result.success) {
-          throw new Error(result.error || 'Processing failed');
-        }
-
-        // Map results with generated parameters
-        const processedResults = (result.results || []).map((res: any, index: number) => ({
-          name: res.name,
-          url: res.url,
-          processingDetails: parameters[index] || {}
-        }));
-        
-        console.log('Batch processed results:', processedResults);
-
-        // Update job as completed
-        setQueue(prev => prev.map(j => 
-          j.id === job.id 
+        // Update item as completed
+        setQueue(prev => prev.map(queueItem => 
+          queueItem.id === item.id 
             ? { 
-                ...j, 
-                status: 'completed', 
-                progress: 100, 
-                results: processedResults,
-                processingDetails: parameters 
+                ...queueItem, 
+                status: 'completed' as const, 
+                progress: 100,
+                results: results
               }
-            : j
+            : queueItem
         ));
 
-        safeLog('Job completed successfully', { 
-          jobId: job.id, 
-          resultCount: processedResults.length 
-        });
+        safeLog(`Successfully processed ${item.fileName}`, { resultCount: results.length });
 
       } catch (error) {
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          progressInterval = null;
-        }
-        
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
-        // Update job as failed
-        setQueue(prev => prev.map(j => 
-          j.id === job.id 
+        // Update item as error
+        setQueue(prev => prev.map(queueItem => 
+          queueItem.id === item.id 
             ? { 
-                ...j, 
-                status: 'error', 
-                progress: 0, 
-                errorMessage 
+                ...queueItem, 
+                status: 'error' as const, 
+                progress: 0,
+                error: errorMessage
               }
-            : j
+            : queueItem
         ));
 
-        safeLog('Job failed', { jobId: job.id, error: errorMessage });
+        safeLog(`Failed to process ${item.fileName}`, { error: errorMessage });
       }
 
-      // Small delay between jobs to prevent overwhelming
+      // Small delay between items
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
+    setCurrentItem(null);
     setIsProcessing(false);
+
+    const completedCount = queue.filter(item => item.status === 'completed').length;
+    const errorCount = queue.filter(item => item.status === 'error').length;
+
+    if (completedCount > 0) {
+      toast.success(`Batch processing completed! ${completedCount} videos processed successfully.`);
+    }
     
-    const completedCount = queue.filter(job => job.status === 'completed').length;
-    const errorCount = queue.filter(job => job.status === 'error').length;
-    
-    if (errorCount === 0) {
-      toast.success(`¡Procesamiento por lotes completado! Se procesaron ${completedCount} videos.`);
-    } else {
-      toast.warning(`Procesamiento por lotes finalizado con ${errorCount} errores. ${completedCount} videos procesados exitosamente.`);
+    if (errorCount > 0) {
+      toast.error(`${errorCount} videos failed to process.`);
     }
 
-    safeLog('Batch processing completed', { completedCount, errorCount });
+    safeLog('Batch processing completed', { 
+      total: waitingItems.length, 
+      completed: completedCount, 
+      errors: errorCount 
+    });
   }, [queue, isProcessing]);
 
   return {
     queue,
     isProcessing,
-    addToQueue,
+    currentItem,
+    addVideosToQueue,
     removeFromQueue,
     clearQueue,
     retryJob,
-    reorderQueue,
     processBatch
   };
-}
+};
