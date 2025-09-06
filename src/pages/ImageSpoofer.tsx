@@ -17,10 +17,9 @@ const ImageSpoofer = () => {
         </div>
 
         <Tabs defaultValue="process" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="process">Process Images</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
-            <TabsTrigger value="presets">Manage Presets</TabsTrigger>
           </TabsList>
           
           <TabsContent value="process" className="space-y-6">
@@ -29,13 +28,6 @@ const ImageSpoofer = () => {
           
           <TabsContent value="results" className="space-y-6">
             <ImageResultsTab />
-          </TabsContent>
-          
-          <TabsContent value="presets" className="space-y-6">
-            <div className="text-center py-12 text-muted-foreground">
-              <h3 className="text-lg font-medium mb-2">Preset Management</h3>
-              <p>Save and load processing parameter presets (Coming Soon)</p>
-            </div>
           </TabsContent>
         </Tabs>
       </div>

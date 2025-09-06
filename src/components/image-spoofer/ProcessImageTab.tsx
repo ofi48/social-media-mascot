@@ -31,8 +31,8 @@ export const ProcessImageTab = () => {
 
   const getEnabledParametersCount = () => {
     const rangeParams = [
-      'brightness', 'contrast', 'saturation', 'hue', 'gamma',
-      'noise', 'blur', 'sharpen', 'vignette', 'rotation', 'scale',
+      'brightness', 'contrast', 'saturation', 'hue',
+      'noise', 'blur', 'rotation', 'scale',
       'customSize', 'randomCrop', 'quality'
     ];
     
@@ -47,8 +47,6 @@ export const ProcessImageTab = () => {
     const booleanCount = [
       parameters.flipHorizontal,
       parameters.flipVertical,
-      parameters.vintage,
-      parameters.edgeEnhancement,
       parameters.watermark.enabled
     ].filter(Boolean).length;
     

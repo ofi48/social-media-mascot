@@ -6,13 +6,10 @@ export interface ImageProcessingParameters {
   contrast: { min: number; max: number; enabled: boolean };
   saturation: { min: number; max: number; enabled: boolean };
   hue: { min: number; max: number; enabled: boolean };
-  gamma: { min: number; max: number; enabled: boolean };
   
   // Visual Effects
   noise: { min: number; max: number; enabled: boolean };
   blur: { min: number; max: number; enabled: boolean };
-  sharpen: { min: number; max: number; enabled: boolean };
-  vignette: { min: number; max: number; enabled: boolean };
   
   // Transformations
   rotation: { min: number; max: number; enabled: boolean };
@@ -29,8 +26,6 @@ export interface ImageProcessingParameters {
   quality: { min: number; max: number; enabled: boolean };
   
   // Special Effects
-  vintage: boolean;
-  edgeEnhancement: boolean;
   watermark: {
     enabled: boolean;
     text: string;
@@ -115,11 +110,8 @@ const defaultParameters: ImageProcessingParameters = {
   contrast: { min: 0.5, max: 1.5, enabled: false },
   saturation: { min: 0.5, max: 1.5, enabled: false },
   hue: { min: -30, max: 30, enabled: false },
-  gamma: { min: 0.7, max: 1.3, enabled: false },
   noise: { min: 0, max: 0.1, enabled: false },
   blur: { min: 0, max: 2, enabled: false },
-  sharpen: { min: 0, max: 1, enabled: false },
-  vignette: { min: 0, max: 0.8, enabled: false },
   rotation: { min: -15, max: 15, enabled: false },
   scale: { min: 0.9, max: 1.1, enabled: false },
   flipHorizontal: false,
@@ -128,8 +120,6 @@ const defaultParameters: ImageProcessingParameters = {
   randomCrop: { min: 0.9, max: 1.0, enabled: false },
   format: 'jpeg',
   quality: { min: 80, max: 95, enabled: false },
-  vintage: false,
-  edgeEnhancement: false,
   watermark: {
     enabled: false,
     text: 'Sample',
@@ -281,6 +271,18 @@ export const ImageProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               b = Math.max(0, Math.min(255, gray + saturation * (b - gray)));
             }
             
+            // Hue shift
+            if (params.hue.enabled) {
+              const hueShift = Math.random() * (params.hue.max - params.hue.min) + params.hue.min;
+              // Convert RGB to HSL, shift hue, convert back to RGB
+              const [h, s, l] = rgbToHsl(r, g, b);
+              const newH = (h + hueShift / 360) % 1;
+              const [newR, newG, newB] = hslToRgb(newH, s, l);
+              r = newR;
+              g = newG;
+              b = newB;
+            }
+            
             // Noise
             if (params.noise.enabled) {
               const noiseLevel = Math.random() * (params.noise.max - params.noise.min) + params.noise.min;
@@ -296,6 +298,22 @@ export const ImageProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
           }
           
           ctx.putImageData(imageData, 0, 0);
+          
+          // Apply blur if enabled
+          if (params.blur.enabled) {
+            const blurAmount = Math.random() * (params.blur.max - params.blur.min) + params.blur.min;
+            ctx.filter = `blur(${blurAmount}px)`;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            if (tempCtx) {
+              tempCanvas.width = width;
+              tempCanvas.height = height;
+              tempCtx.drawImage(canvas, 0, 0);
+              ctx.filter = 'none';
+              ctx.clearRect(0, 0, width, height);
+              ctx.drawImage(tempCanvas, 0, 0);
+            }
+          }
           
           // Apply watermark if enabled
           if (params.watermark.enabled && params.watermark.text) {
@@ -346,6 +364,56 @@ export const ImageProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         reject(new Error('Image processing timeout'));
       }, 10000);
     });
+  };
+
+  // Helper functions for hue shifting
+  const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+
+    if (max === min) {
+      h = s = 0; // achromatic
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+
+    return [h, s, l];
+  };
+
+  const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+    let r, g, b;
+
+    if (s === 0) {
+      r = g = b = l; // achromatic
+    } else {
+      const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   };
 
   const processImage = async (file: File, variations: number) => {

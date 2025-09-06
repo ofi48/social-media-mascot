@@ -94,18 +94,13 @@ export const ImageProcessingParameters = () => {
           parameters.brightness.enabled,
           parameters.contrast.enabled,
           parameters.saturation.enabled,
-          parameters.hue.enabled,
-          parameters.gamma.enabled
+          parameters.hue.enabled
         ].filter(Boolean).length;
       
       case 'effects':
         return [
           parameters.noise.enabled,
-          parameters.blur.enabled,
-          parameters.sharpen.enabled,
-          parameters.vignette.enabled,
-          parameters.vintage,
-          parameters.edgeEnhancement
+          parameters.blur.enabled
         ].filter(Boolean).length;
       
       case 'transform':
@@ -188,17 +183,6 @@ export const ImageProcessingParameters = () => {
             unit="degrees"
           />
           
-          <RangeInput
-            label="Gamma Correction"
-            min={0.5}
-            max={2.0}
-            step={0.1}
-            enabled={parameters.gamma.enabled}
-            value={parameters.gamma}
-            onChange={(value) => updateRangeParameter('gamma', { ...value, enabled: parameters.gamma.enabled })}
-            onEnabledChange={(enabled) => updateRangeParameter('gamma', { ...parameters.gamma, enabled })}
-            unit="gamma value"
-          />
         </AccordionContent>
       </AccordionItem>
 
@@ -235,49 +219,6 @@ export const ImageProcessingParameters = () => {
             unit="pixels"
           />
           
-          <RangeInput
-            label="Sharpen Effect"
-            min={0}
-            max={2}
-            step={0.1}
-            enabled={parameters.sharpen.enabled}
-            value={parameters.sharpen}
-            onChange={(value) => updateRangeParameter('sharpen', { ...value, enabled: parameters.sharpen.enabled })}
-            onEnabledChange={(enabled) => updateRangeParameter('sharpen', { ...parameters.sharpen, enabled })}
-            unit="intensity"
-          />
-          
-          <RangeInput
-            label="Vignette Effect"
-            min={0}
-            max={1}
-            step={0.1}
-            enabled={parameters.vignette.enabled}
-            value={parameters.vignette}
-            onChange={(value) => updateRangeParameter('vignette', { ...value, enabled: parameters.vignette.enabled })}
-            onEnabledChange={(enabled) => updateRangeParameter('vignette', { ...parameters.vignette, enabled })}
-            unit="intensity"
-          />
-          
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Vintage Effect</Label>
-              <Switch
-                checked={parameters.vintage}
-                onCheckedChange={(checked) => updateParameter('vintage', checked)}
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Edge Enhancement</Label>
-              <Switch
-                checked={parameters.edgeEnhancement}
-                onCheckedChange={(checked) => updateParameter('edgeEnhancement', checked)}
-              />
-            </div>
-          </div>
         </AccordionContent>
       </AccordionItem>
 
