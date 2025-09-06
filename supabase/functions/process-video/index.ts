@@ -31,7 +31,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`[${requestId}] Processing video request started`);
+    console.log(`[${requestId}] Processing video request started - Railway optimized version`);
     
     // Parse multipart form data
     const formData = await req.formData();
@@ -48,16 +48,17 @@ serve(async (req) => {
       throw new Error('Invalid file type. Only video files are allowed.');
     }
     
-    // Validate file size (500MB max for Railway processing)
-    const maxSize = 500 * 1024 * 1024; // 500MB
+    // Validate file size (50MB max to align with Supabase Free tier)
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (videoFile.size > maxSize) {
-      throw new Error(`File size exceeds 500MB limit. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
+      throw new Error(`File size exceeds 50MB limit. Current size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     }
     
     const settings = JSON.parse(settingsStr);
     const numCopies = parseInt(numCopiesStr);
     
     console.log(`[${requestId}] Sending ${numCopies} variations to Railway for processing: ${videoFile.name}`);
+    console.log(`[${requestId}] File size: ${(videoFile.size / (1024 * 1024)).toFixed(2)}MB`);
     console.log(`[${requestId}] Settings:`, settings);
     
     // Send to Railway for processing
@@ -135,10 +136,12 @@ async function processVideoOnRailway(
     });
     
     console.log(`[${requestId}] Railway response status: ${response.status}`);
+    console.log(`[${requestId}] Railway response headers:`, Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[${requestId}] Railway error response:`, errorText);
+      console.error(`[${requestId}] Response headers:`, Object.fromEntries(response.headers.entries()));
       throw new Error(`Railway processing failed: ${response.status} - ${errorText}`);
     }
     

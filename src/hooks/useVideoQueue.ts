@@ -74,7 +74,14 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
     }
 
     setIsProcessing(true);
-    safeLog('Starting batch processing', { itemCount: waitingItems.length });
+    safeLog('[VideoQueue] Starting batch processing', { 
+      itemCount: waitingItems.length,
+      totalQueueSize: queue.length,
+      memoryUsage: (performance as any).memory ? {
+        used: Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024),
+        total: Math.round((performance as any).memory.totalJSHeapSize / 1024 / 1024)
+      } : 'unavailable'
+    });
 
     for (const item of waitingItems) {
       try {
@@ -87,7 +94,14 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
             : queueItem
         ));
 
-        safeLog(`Processing item ${item.id}: ${item.fileName}`);
+        safeLog(`[VideoQueue] Processing item ${item.id}: ${item.fileName}`, {
+          fileSize: `${(item.fileSize / 1024 / 1024).toFixed(2)}MB`,
+          numCopies: item.numCopies,
+          enabledSettings: Object.keys(item.settings || {}).filter(key => {
+            const setting = item.settings?.[key as keyof VideoPresetSettings];
+            return typeof setting === 'object' && setting !== null && 'enabled' in setting && setting.enabled;
+          })
+        });
 
         // Simulate progress updates
         let progressInterval: NodeJS.Timeout | null = null;
@@ -108,22 +122,38 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
         formData.append('settings', JSON.stringify(item.settings));
         formData.append('numCopies', (item.numCopies || 3).toString());
 
-        // Call the processing function
+        // Call the processing function with improved error handling
         const response = await supabase.functions.invoke('process-video', {
           body: formData
         });
 
         if (progressInterval) clearInterval(progressInterval);
 
+        safeLog(`[VideoQueue] Edge Function response for ${item.fileName}`, {
+          hasError: !!response.error,
+          hasData: !!response.data,
+          dataSuccess: response.data?.success,
+          errorMessage: response.error?.message
+        });
+
         if (response.error) {
-          throw new Error(response.error.message || 'Processing failed');
+          throw new Error(`Edge Function error: ${response.error.message || 'Unknown error'}`);
         }
 
         if (!response.data?.success) {
-          throw new Error(response.data?.error || 'Processing failed');
+          throw new Error(`Processing failed: ${response.data?.error || 'Unknown error from Railway'}`);
         }
 
         const results = response.data.results || [];
+
+        // Validate and normalize result URLs
+        const processedResults = results.map((result: any) => ({
+          name: result.name,
+          url: result.url.startsWith('http') 
+            ? result.url 
+            : `https://social-media-mascot-production.up.railway.app${result.url}`,
+          processingDetails: result.processingDetails
+        }));
 
         // Update item as completed
         setQueue(prev => prev.map(queueItem => 
@@ -132,15 +162,24 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
                 ...queueItem, 
                 status: 'completed' as const, 
                 progress: 100,
-                results: results
+                results: processedResults
               }
             : queueItem
         ));
 
-        safeLog(`Successfully processed ${item.fileName}`, { resultCount: results.length });
+        safeLog(`[VideoQueue] Successfully processed ${item.fileName}`, { 
+          resultCount: processedResults.length,
+          resultUrls: processedResults.map(r => r.url)
+        });
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        safeLog(`[VideoQueue] Error processing ${item.fileName}`, { 
+          error: errorMessage,
+          errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+          fileSize: `${(item.fileSize / 1024 / 1024).toFixed(2)}MB`
+        });
         
         // Update item as error
         setQueue(prev => prev.map(queueItem => 
@@ -154,7 +193,8 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
             : queueItem
         ));
 
-        safeLog(`Failed to process ${item.fileName}`, { error: errorMessage });
+        // Show specific error toast
+        toast.error(`Error procesando ${item.fileName}: ${errorMessage}`);
       }
 
       // Small delay between items
@@ -175,10 +215,16 @@ export const useVideoQueue = (): UseVideoQueueReturn => {
       toast.error(`${errorCount} videos failed to process.`);
     }
 
-    safeLog('Batch processing completed', { 
+    safeLog('[VideoQueue] Batch processing completed', { 
       total: waitingItems.length, 
       completed: completedCount, 
-      errors: errorCount 
+      errors: errorCount,
+      finalQueueState: queue.map(item => ({
+        id: item.id,
+        fileName: item.fileName,
+        status: item.status,
+        hasResults: !!item.results?.length
+      }))
     });
   }, [queue, isProcessing]);
 

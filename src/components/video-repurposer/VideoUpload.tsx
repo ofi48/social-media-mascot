@@ -16,7 +16,7 @@ export function VideoUpload({
   onFilesSelected, 
   multiple = false, 
   disabled = false,
-  maxSize = 100 * 1024 * 1024 // 100MB default
+  maxSize = 50 * 1024 * 1024 // 50MB para alinear con Supabase Free tier
 }: VideoUploadProps) {
   
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
