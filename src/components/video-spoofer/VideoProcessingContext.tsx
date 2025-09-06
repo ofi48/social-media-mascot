@@ -338,6 +338,26 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               reject(new Error('MediaRecorder error: ' + event));
             };
             
+            // Generate constant effect values once for the entire video
+            const constantEffects = {
+              rotation: params.rotation.enabled ? 
+                Math.random() * (params.rotation.max - params.rotation.min) + params.rotation.min : 0,
+              zoom: params.zoom.enabled ? 
+                Math.random() * (params.zoom.max - params.zoom.min) + params.zoom.min : 1,
+              brightness: params.brightness.enabled ? 
+                Math.random() * (params.brightness.max - params.brightness.min) + params.brightness.min : 0,
+              contrast: params.contrast.enabled ? 
+                Math.random() * (params.contrast.max - params.contrast.min) + params.contrast.min : 1,
+              noiseLevel: params.noise.enabled ? 
+                Math.random() * (params.noise.max - params.noise.min) + params.noise.min : 0,
+              saturation: params.saturation.enabled ?
+                Math.random() * (params.saturation.max - params.saturation.min) + params.saturation.min : 1,
+              gamma: params.gamma.enabled ?
+                Math.random() * (params.gamma.max - params.gamma.min) + params.gamma.min : 1,
+              vignetteStrength: params.vignette.enabled ?
+                Math.random() * (params.vignette.max - params.vignette.min) + params.vignette.min : 0
+            };
+            
             mediaRecorder.start();
             
             const renderFrame = () => {
@@ -359,18 +379,13 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               // Apply transformations
               ctx.translate(canvas.width / 2, canvas.height / 2);
               
-              // Apply subtle rotation if enabled
+              // Apply constant rotation throughout video
               if (params.rotation.enabled) {
-                const rotation = Math.random() * (params.rotation.max - params.rotation.min) + params.rotation.min;
-                ctx.rotate((rotation * Math.PI) / 180);
+                ctx.rotate((constantEffects.rotation * Math.PI) / 180);
               }
               
-              // Apply very subtle zoom and flip
-              let scaleX = 1, scaleY = 1;
-              if (params.zoom.enabled) {
-                const zoom = Math.random() * (params.zoom.max - params.zoom.min) + params.zoom.min;
-                scaleX = scaleY = zoom;
-              }
+              // Apply constant zoom and flip
+              let scaleX = constantEffects.zoom, scaleY = constantEffects.zoom;
               
               if (params.flipHorizontal) {
                 scaleX *= -1;
@@ -385,57 +400,44 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               
               ctx.restore();
               
-              // Apply post-processing effects
+              // Apply post-processing effects using constant values
               if (params.brightness.enabled || params.contrast.enabled || params.noise.enabled || 
                   params.saturation.enabled || params.gamma.enabled || params.vignette.enabled) {
                 try {
                   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                   const data = imageData.data;
                   
-                  const brightness = params.brightness.enabled ? 
-                    Math.random() * (params.brightness.max - params.brightness.min) + params.brightness.min : 0;
-                  const contrast = params.contrast.enabled ? 
-                    Math.random() * (params.contrast.max - params.contrast.min) + params.contrast.min : 1;
-                  const noiseLevel = params.noise.enabled ? 
-                    Math.random() * (params.noise.max - params.noise.min) + params.noise.min : 0;
-                  const saturation = params.saturation.enabled ?
-                    Math.random() * (params.saturation.max - params.saturation.min) + params.saturation.min : 1;
-                  const gamma = params.gamma.enabled ?
-                    Math.random() * (params.gamma.max - params.gamma.min) + params.gamma.min : 1;
-                  const vignetteStrength = params.vignette.enabled ?
-                    Math.random() * (params.vignette.max - params.vignette.min) + params.vignette.min : 0;
-                  
                   for (let i = 0; i < data.length; i += 4) {
                     let r = data[i];
                     let g = data[i + 1];
                     let b = data[i + 2];
                     
-                    // Apply brightness and contrast
+                    // Apply brightness and contrast using constant values
                     if (params.brightness.enabled || params.contrast.enabled) {
-                      r = Math.max(0, Math.min(255, (r - 128) * contrast + 128 + brightness * 255));
-                      g = Math.max(0, Math.min(255, (g - 128) * contrast + 128 + brightness * 255));
-                      b = Math.max(0, Math.min(255, (b - 128) * contrast + 128 + brightness * 255));
+                      r = Math.max(0, Math.min(255, (r - 128) * constantEffects.contrast + 128 + constantEffects.brightness * 255));
+                      g = Math.max(0, Math.min(255, (g - 128) * constantEffects.contrast + 128 + constantEffects.brightness * 255));
+                      b = Math.max(0, Math.min(255, (b - 128) * constantEffects.contrast + 128 + constantEffects.brightness * 255));
                     }
                     
-                    // Apply saturation
+                    // Apply saturation using constant value
                     if (params.saturation.enabled) {
                       const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                      r = gray + saturation * (r - gray);
-                      g = gray + saturation * (g - gray);
-                      b = gray + saturation * (b - gray);
+                      r = gray + constantEffects.saturation * (r - gray);
+                      g = gray + constantEffects.saturation * (g - gray);
+                      b = gray + constantEffects.saturation * (b - gray);
                       r = Math.max(0, Math.min(255, r));
                       g = Math.max(0, Math.min(255, g));
                       b = Math.max(0, Math.min(255, b));
                     }
                     
-                    // Apply gamma correction
+                    // Apply gamma correction using constant value
                     if (params.gamma.enabled) {
-                      r = Math.pow(r / 255, gamma) * 255;
-                      g = Math.pow(g / 255, gamma) * 255;
-                      b = Math.pow(b / 255, gamma) * 255;
+                      r = Math.pow(r / 255, constantEffects.gamma) * 255;
+                      g = Math.pow(g / 255, constantEffects.gamma) * 255;
+                      b = Math.pow(b / 255, constantEffects.gamma) * 255;
                     }
                     
-                    // Apply vignette effect
+                    // Apply vignette effect using constant value
                     if (params.vignette.enabled) {
                       const x = (i / 4) % canvas.width;
                       const y = Math.floor((i / 4) / canvas.width);
@@ -443,15 +445,15 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
                       const centerY = canvas.height / 2;
                       const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
                       const maxDistance = Math.sqrt(Math.pow(centerX, 2) + Math.pow(centerY, 2));
-                      const vignette = 1 - (distance / maxDistance) * vignetteStrength;
+                      const vignette = 1 - (distance / maxDistance) * constantEffects.vignetteStrength;
                       r *= vignette;
                       g *= vignette;
                       b *= vignette;
                     }
                     
-                    // Apply noise
+                    // Apply noise using constant value
                     if (params.noise.enabled) {
-                      const noise = (Math.random() - 0.5) * noiseLevel * 255;
+                      const noise = (Math.random() - 0.5) * constantEffects.noiseLevel * 255;
                       r = Math.max(0, Math.min(255, r + noise));
                       g = Math.max(0, Math.min(255, g + noise));
                       b = Math.max(0, Math.min(255, b + noise));
