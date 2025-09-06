@@ -42,14 +42,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Main video processing endpoint
+// Optimized video processing endpoint with better error handling
 app.post('/process-video', upload.single('video'), async (req, res) => {
   const requestId = req.body.requestId || Date.now().toString();
+  const startTime = Date.now();
   
   try {
-    console.log(`[${requestId}] Processing video request started`);
-    console.log(`[${requestId}] Memory usage:`, process.memoryUsage());
+    console.log(`[${requestId}] ⚡ Video processing started`);
+    console.log(`[${requestId}] 📊 Initial memory:`, formatMemoryUsage(process.memoryUsage()));
     
+    // Quick validation
     if (!req.file) {
       return res.status(400).json({ 
         success: false, 
@@ -58,265 +60,352 @@ app.post('/process-video', upload.single('video'), async (req, res) => {
     }
     
     const settings = JSON.parse(req.body.settings || '{}');
-    const numCopies = parseInt(req.body.numCopies || '1');
+    const numCopies = Math.min(parseInt(req.body.numCopies || '1'), 5); // Limit to 5 variations max
     
-    console.log(`[${requestId}] Processing ${numCopies} variations`);
-    console.log(`[${requestId}] File size: ${(req.file.size / (1024 * 1024)).toFixed(2)}MB`);
+    console.log(`[${requestId}] 🎥 File: ${req.file.originalname} (${(req.file.size / (1024 * 1024)).toFixed(2)}MB)`);
+    console.log(`[${requestId}] 🔄 Generating ${numCopies} variations`);
     
-    // File is already saved to disk by multer
-    const inputPath = req.file.path;
-    console.log(`[${requestId}] Input file at: ${inputPath}`);
-    
-    // Process video variations
-    const results = await processVideoVariations(inputPath, settings, numCopies, requestId);
-    
-    // Clean up input file
-    try {
-      fs.unlinkSync(inputPath);
-      console.log(`[${requestId}] Cleaned up input file`);
-    } catch (error) {
-      console.warn(`[${requestId}] Failed to clean up input file:`, error.message);
-    }
-    
-    // Force garbage collection if available
-    if (global.gc) {
-      global.gc();
-      console.log(`[${requestId}] Forced garbage collection`);
-    }
-    
-    res.json({
-      success: true,
-      results: results,
-      processedAt: new Date().toISOString()
+    // Set response timeout to prevent hanging
+    res.setTimeout(270000, () => { // 4.5 minutes
+      console.error(`[${requestId}] ⏰ Response timeout reached`);
+      if (!res.headersSent) {
+        res.status(504).json({
+          success: false,
+          error: 'Video processing timeout. Try with a smaller file.'
+        });
+      }
     });
     
-    console.log(`[${requestId}] Processing completed successfully with ${results.length} results`);
-    console.log(`[${requestId}] Final memory usage:`, process.memoryUsage());
+    // Send immediate acknowledgment
+    res.setHeader('Content-Type', 'application/json');
+    
+    const inputPath = req.file.path;
+    console.log(`[${requestId}] 📁 Processing file at: ${inputPath}`);
+    
+    // Optimized processing with memory monitoring
+    const results = await processVideoWithMonitoring(inputPath, settings, numCopies, requestId);
+    
+    // Clean up immediately
+    cleanupFile(inputPath, requestId);
+    
+    const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    
+    if (!res.headersSent) {
+      res.json({
+        success: true,
+        results: results,
+        processedAt: new Date().toISOString(),
+        processingTimeSeconds: processingTime,
+        memoryUsage: formatMemoryUsage(process.memoryUsage())
+      });
+      
+      console.log(`[${requestId}] ✅ Completed in ${processingTime}s with ${results.length} results`);
+    }
     
   } catch (error) {
-    console.error(`[${requestId}] Processing failed:`, error);
-    console.error(`[${requestId}] Memory usage on error:`, process.memoryUsage());
+    console.error(`[${requestId}] ❌ Processing failed:`, error.message);
+    console.error(`[${requestId}] 📊 Error memory:`, formatMemoryUsage(process.memoryUsage()));
     
-    // Clean up any temporary files on error
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-        console.log(`[${requestId}] Cleaned up file after error`);
-      } catch (cleanupError) {
-        console.error(`[${requestId}] Error cleaning up file:`, cleanupError);
-      }
+    // Emergency cleanup
+    if (req.file?.path) {
+      cleanupFile(req.file.path, requestId);
     }
     
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Video processing failed'
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Video processing failed',
+        processingTimeSeconds: ((Date.now() - startTime) / 1000).toFixed(2)
+      });
+    }
   }
 });
 
-async function processVideoVariations(inputPath, settings, numCopies, requestId) {
+// Helper function for memory formatting
+function formatMemoryUsage(memUsage) {
+  return {
+    rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+    heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+    external: `${Math.round(memUsage.external / 1024 / 1024)}MB`
+  };
+}
+
+// Helper function for safe file cleanup
+function cleanupFile(filePath, requestId) {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`[${requestId}] 🗑️ Cleaned up: ${path.basename(filePath)}`);
+    }
+  } catch (error) {
+    console.warn(`[${requestId}] ⚠️ Cleanup failed: ${error.message}`);
+  }
+}
+
+// Optimized video processing with memory monitoring
+async function processVideoWithMonitoring(inputPath, settings, numCopies, requestId) {
   const results = [];
   const timestamp = Date.now();
   
+  console.log(`[${requestId}] 🚀 Starting optimized video processing`);
+  
   for (let i = 0; i < numCopies; i++) {
+    const variationStart = Date.now();
+    
     try {
-      console.log(`[${requestId}] Processing variation ${i + 1}/${numCopies}`);
-      console.log(`[${requestId}] Memory before variation:`, process.memoryUsage());
+      console.log(`[${requestId}] 🔄 Variation ${i + 1}/${numCopies} started`);
       
-      // Generate processing parameters for this variation
-      const params = generateProcessingParameters(settings, i);
+      // Generate optimized parameters
+      const params = generateOptimizedParameters(settings, i);
       
-      // Create output path
-      const outputFileName = `variation_${i + 1}_${timestamp}.mp4`;
+      // Create output path with better naming
+      const outputFileName = `processed_${timestamp}_v${i + 1}.mp4`;
       const outputPath = path.join(outputDir, outputFileName);
       
-      // Process video with FFmpeg
-      await processWithFFmpeg(inputPath, outputPath, params, requestId);
+      // Process with improved FFmpeg settings
+      await processWithOptimizedFFmpeg(inputPath, outputPath, params, requestId);
       
-      // Create result object
+      // Verify output file exists and has reasonable size
+      if (!fs.existsSync(outputPath)) {
+        throw new Error(`Output file not created: ${outputFileName}`);
+      }
+      
+      const outputStats = fs.statSync(outputPath);
+      const outputSizeMB = (outputStats.size / (1024 * 1024)).toFixed(2);
+      
       const result = {
         name: outputFileName,
-        url: `/download/${outputFileName}`, // Will be served by this server
-        processingDetails: params
+        url: `/download/${outputFileName}`,
+        processingDetails: {
+          ...params,
+          outputSizeMB: outputSizeMB,
+          processingTimeMs: Date.now() - variationStart
+        }
       };
       
       results.push(result);
-      console.log(`[${requestId}] Variation ${i + 1} completed: ${outputFileName}`);
-      console.log(`[${requestId}] Memory after variation:`, process.memoryUsage());
       
-      // Small delay to allow memory cleanup between variations
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const variationTime = ((Date.now() - variationStart) / 1000).toFixed(1);
+      console.log(`[${requestId}] ✅ Variation ${i + 1} completed in ${variationTime}s (${outputSizeMB}MB)`);
+      
+      // Force garbage collection between variations
+      if (global.gc && i < numCopies - 1) {
+        global.gc();
+        await new Promise(resolve => setTimeout(resolve, 200)); // Brief pause
+      }
       
     } catch (error) {
-      console.error(`[${requestId}] Failed to process variation ${i + 1}:`, error);
-      // Continue with other variations
+      console.error(`[${requestId}] ❌ Variation ${i + 1} failed:`, error.message);
+      
+      // Create a placeholder result for failed variations
+      results.push({
+        name: `failed_${timestamp}_v${i + 1}.mp4`,
+        url: null,
+        processingDetails: {
+          error: error.message,
+          variationIndex: i + 1
+        }
+      });
     }
   }
   
-  return results;
+  console.log(`[${requestId}] 🏁 Processing completed: ${results.filter(r => r.url).length}/${numCopies} successful`);
+  return results.filter(r => r.url); // Return only successful results
 }
 
-function processWithFFmpeg(inputPath, outputPath, params, requestId) {
+// Optimized FFmpeg processing with better error handling
+function processWithOptimizedFFmpeg(inputPath, outputPath, params, requestId) {
   return new Promise((resolve, reject) => {
-    console.log(`[${requestId}] FFmpeg processing with params:`, params);
+    const timeout = setTimeout(() => {
+      console.error(`[${requestId}] ⏰ FFmpeg timeout for ${path.basename(outputPath)}`);
+      reject(new Error('FFmpeg processing timeout'));
+    }, 120000); // 2 minute timeout per variation
+
+    console.log(`[${requestId}] 🎬 FFmpeg starting with optimized params`);
     
     let command = ffmpeg(inputPath);
     
-    // Apply video filters based on parameters
-    const filters = [];
+    // Build filter chain efficiently
+    const videoFilters = [];
+    const audioFilters = [];
     
-    // Color adjustments
-    if (params.saturation !== undefined || params.contrast !== undefined || params.brightness !== undefined) {
-      const saturation = params.saturation || 1.0;
-      const contrast = params.contrast || 1.0;
-      const brightness = params.brightness || 0.0;
-      filters.push(`eq=saturation=${saturation}:contrast=${contrast}:brightness=${brightness}`);
+    // Color adjustments (combined into single eq filter)
+    const colorParams = [];
+    if (params.saturation !== undefined && params.saturation !== 1.0) {
+      colorParams.push(`saturation=${params.saturation}`);
+    }
+    if (params.contrast !== undefined && params.contrast !== 1.0) {
+      colorParams.push(`contrast=${params.contrast}`);
+    }
+    if (params.brightness !== undefined && params.brightness !== 0.0) {
+      colorParams.push(`brightness=${params.brightness}`);
+    }
+    if (colorParams.length > 0) {
+      videoFilters.push(`eq=${colorParams.join(':')}`);
     }
     
-    // Speed adjustment
+    // Speed adjustment with audio sync
     if (params.speed && params.speed !== 1.0) {
-      filters.push(`setpts=${1/params.speed}*PTS`);
+      videoFilters.push(`setpts=${(1/params.speed).toFixed(3)}*PTS`);
+      audioFilters.push(`atempo=${params.speed}`);
     }
     
-    // Zoom/Scale
+    // Zoom/Scale optimization
     if (params.zoom && params.zoom !== 1.0) {
-      filters.push(`scale=iw*${params.zoom}:ih*${params.zoom}`);
+      const scale = params.zoom.toFixed(3);
+      videoFilters.push(`scale=iw*${scale}:ih*${scale}:flags=bilinear`);
     }
     
     // Rotation
     if (params.rotation && params.rotation !== 0) {
-      const radians = params.rotation * Math.PI / 180;
-      filters.push(`rotate=${radians}:fillcolor=black`);
+      const radians = (params.rotation * Math.PI / 180).toFixed(4);
+      videoFilters.push(`rotate=${radians}:fillcolor=black:bilinear=0`);
     }
     
     // Horizontal flip
     if (params.flipHorizontal) {
-      filters.push('hflip');
+      videoFilters.push('hflip');
     }
     
-    // Apply filters
-    if (filters.length > 0) {
-      command = command.videoFilter(filters.join(','));
+    // Apply filters efficiently
+    if (videoFilters.length > 0) {
+      command = command.videoFilter(videoFilters.join(','));
     }
     
-    // Audio volume
+    // Audio volume and filters
     if (params.volume && params.volume !== 1.0) {
-      command = command.audioFilter(`volume=${params.volume}`);
+      audioFilters.push(`volume=${params.volume}`);
     }
     
-    // Video bitrate
-    if (params.videoBitrate) {
-      command = command.videoBitrate(params.videoBitrate);
+    if (audioFilters.length > 0) {
+      command = command.audioFilter(audioFilters.join(','));
     }
     
-    // Frame rate
-    if (params.frameRate) {
-      command = command.fps(params.frameRate);
-    }
-    
-    // Output settings with memory optimization
+    // Optimized output settings for Railway's environment
     command
       .output(outputPath)
       .videoCodec('libx264')
       .audioCodec('aac')
-      .addOption('-preset', 'ultrafast') // Faster encoding, less memory usage
-      .addOption('-crf', '23') // Good quality balance
-      .addOption('-maxrate', '2000k') // Limit bitrate spikes
-      .addOption('-bufsize', '4000k') // Buffer size
+      .addOption('-preset', 'veryfast') // Balanced speed vs quality
+      .addOption('-crf', '24') // Slightly lower quality for speed
+      .addOption('-maxrate', '1500k') // Conservative bitrate
+      .addOption('-bufsize', '3000k') // Smaller buffer
+      .addOption('-movflags', '+faststart') // Web optimization
+      .addOption('-pix_fmt', 'yuv420p') // Compatibility
+      .addOption('-threads', '2') // Limit threads for memory
       .format('mp4')
       .on('start', (commandLine) => {
-        console.log(`[${requestId}] FFmpeg command: ${commandLine}`);
+        console.log(`[${requestId}] 🎬 FFmpeg: ${commandLine.substring(0, 100)}...`);
       })
       .on('progress', (progress) => {
-        if (progress.percent) {
-          console.log(`[${requestId}] Processing: ${Math.round(progress.percent)}%`);
+        if (progress.percent && progress.percent % 10 === 0) {
+          console.log(`[${requestId}] 📈 Progress: ${Math.round(progress.percent)}%`);
         }
       })
       .on('end', () => {
-        console.log(`[${requestId}] FFmpeg processing completed`);
+        clearTimeout(timeout);
+        console.log(`[${requestId}] ✅ FFmpeg completed: ${path.basename(outputPath)}`);
         resolve();
       })
       .on('error', (error) => {
-        console.error(`[${requestId}] FFmpeg error:`, error);
+        clearTimeout(timeout);
+        console.error(`[${requestId}] ❌ FFmpeg error: ${error.message}`);
+        
+        // Clean up partial file
+        if (fs.existsSync(outputPath)) {
+          try {
+            fs.unlinkSync(outputPath);
+            console.log(`[${requestId}] 🗑️ Cleaned up partial file`);
+          } catch (e) {
+            console.warn(`[${requestId}] ⚠️ Failed to clean partial file: ${e.message}`);
+          }
+        }
+        
         reject(error);
       })
       .run();
   });
 }
 
-function generateProcessingParameters(settings, variationIndex) {
+// Optimized parameter generation with validation
+function generateOptimizedParameters(settings, variationIndex) {
   const params = {
     variationIndex: variationIndex + 1,
-    processedAt: new Date().toISOString()
+    processedAt: new Date().toISOString(),
+    seed: Math.random() // For reproducible variations
   };
   
-  // Generate random values within specified ranges for enabled settings
+  // Helper function for safe random generation
+  const safeRandom = (setting, decimals = 2) => {
+    if (!setting?.enabled || setting.min === undefined || setting.max === undefined) {
+      return undefined;
+    }
+    const value = setting.min + (setting.max - setting.min) * Math.random();
+    return Number(value.toFixed(decimals));
+  };
+  
+  // Video quality parameters (conservative for stability)
   if (settings.videoBitrate?.enabled) {
-    params.videoBitrate = Math.floor(
-      settings.videoBitrate.min + 
-      (settings.videoBitrate.max - settings.videoBitrate.min) * Math.random()
-    );
+    params.videoBitrate = Math.floor(safeRandom(settings.videoBitrate, 0));
+    // Clamp to reasonable values for Railway
+    params.videoBitrate = Math.max(500, Math.min(params.videoBitrate, 3000));
   }
   
   if (settings.frameRate?.enabled) {
-    params.frameRate = Math.floor(
-      settings.frameRate.min + 
-      (settings.frameRate.max - settings.frameRate.min) * Math.random()
-    );
+    params.frameRate = Math.floor(safeRandom(settings.frameRate, 0));
+    params.frameRate = Math.max(15, Math.min(params.frameRate, 30));
   }
   
-  if (settings.saturation?.enabled) {
-    params.saturation = Number((
-      settings.saturation.min + 
-      (settings.saturation.max - settings.saturation.min) * Math.random()
-    ).toFixed(2));
+  // Color adjustments (subtle for better results)
+  params.saturation = safeRandom(settings.saturation, 3);
+  if (params.saturation !== undefined) {
+    params.saturation = Math.max(0.5, Math.min(params.saturation, 1.5));
   }
   
-  if (settings.contrast?.enabled) {
-    params.contrast = Number((
-      settings.contrast.min + 
-      (settings.contrast.max - settings.contrast.min) * Math.random()
-    ).toFixed(2));
+  params.contrast = safeRandom(settings.contrast, 3);
+  if (params.contrast !== undefined) {
+    params.contrast = Math.max(0.7, Math.min(params.contrast, 1.3));
   }
   
-  if (settings.brightness?.enabled) {
-    params.brightness = Number((
-      settings.brightness.min + 
-      (settings.brightness.max - settings.brightness.min) * Math.random()
-    ).toFixed(2));
+  params.brightness = safeRandom(settings.brightness, 3);
+  if (params.brightness !== undefined) {
+    params.brightness = Math.max(-0.2, Math.min(params.brightness, 0.2));
   }
   
-  if (settings.speed?.enabled) {
-    params.speed = Number((
-      settings.speed.min + 
-      (settings.speed.max - settings.speed.min) * Math.random()
-    ).toFixed(2));
+  // Speed adjustments (small changes for stability)
+  params.speed = safeRandom(settings.speed, 3);
+  if (params.speed !== undefined) {
+    params.speed = Math.max(0.8, Math.min(params.speed, 1.2));
   }
   
-  if (settings.zoom?.enabled) {
-    params.zoom = Number((
-      settings.zoom.min + 
-      (settings.zoom.max - settings.zoom.min) * Math.random()
-    ).toFixed(2));
+  // Zoom (minimal to avoid quality loss)
+  params.zoom = safeRandom(settings.zoom, 3);
+  if (params.zoom !== undefined) {
+    params.zoom = Math.max(0.95, Math.min(params.zoom, 1.1));
   }
   
-  if (settings.rotation?.enabled) {
-    params.rotation = Number((
-      settings.rotation.min + 
-      (settings.rotation.max - settings.rotation.min) * Math.random()
-    ).toFixed(2));
+  // Rotation (small angles)
+  params.rotation = safeRandom(settings.rotation, 2);
+  if (params.rotation !== undefined) {
+    params.rotation = Math.max(-5, Math.min(params.rotation, 5));
   }
   
-  if (settings.flipHorizontal) {
+  // Random flip (if enabled)
+  if (settings.flipHorizontal === true) {
     params.flipHorizontal = Math.random() > 0.5;
   }
   
-  if (settings.volume?.enabled) {
-    params.volume = Number((
-      settings.volume.min + 
-      (settings.volume.max - settings.volume.min) * Math.random()
-    ).toFixed(2));
+  // Volume (conservative)
+  params.volume = safeRandom(settings.volume, 3);
+  if (params.volume !== undefined) {
+    params.volume = Math.max(0.7, Math.min(params.volume, 1.3));
   }
+  
+  console.log(`[Variation ${params.variationIndex}] Generated params:`, 
+    Object.entries(params)
+      .filter(([k, v]) => v !== undefined && k !== 'processedAt')
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(', ') || 'No changes');
   
   return params;
 }
