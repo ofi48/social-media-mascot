@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const tools = [
-  { title: "Video Spoofer", url: "/video-spoofer", icon: Video },
+  { title: "Video Repurposer", url: "/video-repurposer", icon: Video },
   { title: "Video Similarity", url: "/video-similarity", icon: Search },
   { title: "Image Similarity", url: "/image-similarity", icon: Scan },
   { title: "Image Spoofer", url: "/image-spoofer", icon: Image },

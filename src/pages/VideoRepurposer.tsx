@@ -1,7 +1,7 @@
 import VideoRepurposer from "@/components/video-repurposer/VideoRepurposer";
 
-const VideoSpoofer = () => {
+const VideoRepurposerPage = () => {
   return <VideoRepurposer />;
 };
 
-export default VideoSpoofer;
+export default VideoRepurposerPage;

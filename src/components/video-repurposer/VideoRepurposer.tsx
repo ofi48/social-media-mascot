@@ -105,7 +105,7 @@ export const VideoRepurposer = () => {
           <div className="text-center space-y-4 mb-8">
             <h1 className="text-4xl font-bold text-foreground">Video Repurposer</h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Generate multiple unique video variants with randomized effects and transformations. 
+              Transform your videos into multiple unique variations with advanced processing effects. 
               Perfect for content creators, marketers, and social media managers.
             </p>
           </div>
