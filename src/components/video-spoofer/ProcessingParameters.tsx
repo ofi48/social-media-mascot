@@ -153,10 +153,10 @@ export const ProcessingParameters = () => {
           <AccordionContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <RangeInput
-                label="Video Bitrate"
-                min={1000}
-                max={15000}
-                step={100}
+                label="Video Bitrate (Subtle)"
+                min={7000}
+                max={12000}
+                step={50}
                 enabled={parameters.videoBitrate.enabled}
                 value={{ min: parameters.videoBitrate.min, max: parameters.videoBitrate.max }}
                 onChange={(value) => updateRangeParameter('videoBitrate', { ...value, enabled: parameters.videoBitrate.enabled })}
@@ -180,10 +180,10 @@ export const ProcessingParameters = () => {
           <AccordionContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <RangeInput
-                label="Saturation"
-                min={0.5}
-                max={1.5}
-                step={0.1}
+                label="Saturation (Subtle)"
+                min={0.9}
+                max={1.1}
+                step={0.01}
                 enabled={parameters.saturation.enabled}
                 value={{ min: parameters.saturation.min, max: parameters.saturation.max }}
                 onChange={(value) => updateRangeParameter('saturation', { ...value, enabled: parameters.saturation.enabled })}
@@ -191,10 +191,10 @@ export const ProcessingParameters = () => {
                 unit="x"
               />
               <RangeInput
-                label="Contrast"
-                min={0.5}
-                max={1.5}
-                step={0.1}
+                label="Contrast (Subtle)"
+                min={0.95}
+                max={1.05}
+                step={0.01}
                 enabled={parameters.contrast.enabled}
                 value={{ min: parameters.contrast.min, max: parameters.contrast.max }}
                 onChange={(value) => updateRangeParameter('contrast', { ...value, enabled: parameters.contrast.enabled })}
@@ -202,20 +202,20 @@ export const ProcessingParameters = () => {
                 unit="x"
               />
               <RangeInput
-                label="Brightness"
-                min={-0.3}
-                max={0.3}
-                step={0.1}
+                label="Brightness (Subtle)"
+                min={-0.05}
+                max={0.05}
+                step={0.01}
                 enabled={parameters.brightness.enabled}
                 value={{ min: parameters.brightness.min, max: parameters.brightness.max }}
                 onChange={(value) => updateRangeParameter('brightness', { ...value, enabled: parameters.brightness.enabled })}
                 onEnabledChange={(enabled) => updateRangeParameter('brightness', { ...parameters.brightness, enabled })}
               />
               <RangeInput
-                label="Gamma"
-                min={0.7}
-                max={1.3}
-                step={0.1}
+                label="Gamma (Subtle)"
+                min={0.95}
+                max={1.05}
+                step={0.01}
                 enabled={parameters.gamma.enabled}
                 value={{ min: parameters.gamma.min, max: parameters.gamma.max }}
                 onChange={(value) => updateRangeParameter('gamma', { ...value, enabled: parameters.gamma.enabled })}
@@ -246,30 +246,30 @@ export const ProcessingParameters = () => {
           <AccordionContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <RangeInput
-                label="Vignette"
+                label="Vignette (Subtle)"
                 min={0}
-                max={0.8}
-                step={0.1}
+                max={0.1}
+                step={0.01}
                 enabled={parameters.vignette.enabled}
                 value={{ min: parameters.vignette.min, max: parameters.vignette.max }}
                 onChange={(value) => updateRangeParameter('vignette', { ...value, enabled: parameters.vignette.enabled })}
                 onEnabledChange={(enabled) => updateRangeParameter('vignette', { ...parameters.vignette, enabled })}
               />
               <RangeInput
-                label="Noise"
+                label="Noise (Minimal)"
                 min={0}
-                max={0.1}
-                step={0.01}
+                max={0.01}
+                step={0.001}
                 enabled={parameters.noise.enabled}
                 value={{ min: parameters.noise.min, max: parameters.noise.max }}
                 onChange={(value) => updateRangeParameter('noise', { ...value, enabled: parameters.noise.enabled })}
                 onEnabledChange={(enabled) => updateRangeParameter('noise', { ...parameters.noise, enabled })}
               />
               <RangeInput
-                label="Pixel Shift"
+                label="Pixel Shift (Minimal)"
                 min={0}
-                max={5}
-                step={1}
+                max={2}
+                step={0.5}
                 enabled={parameters.pixelShift.enabled}
                 value={{ min: parameters.pixelShift.min, max: parameters.pixelShift.max }}
                 onChange={(value) => updateRangeParameter('pixelShift', { ...value, enabled: parameters.pixelShift.enabled })}
@@ -277,10 +277,10 @@ export const ProcessingParameters = () => {
                 unit=" px"
               />
               <RangeInput
-                label="Speed"
-                min={0.5}
-                max={2.0}
-                step={0.1}
+                label="Speed (Preserve Duration)"
+                min={0.98}
+                max={1.02}
+                step={0.01}
                 enabled={parameters.speed.enabled}
                 value={{ min: parameters.speed.min, max: parameters.speed.max }}
                 onChange={(value) => updateRangeParameter('speed', { ...value, enabled: parameters.speed.enabled })}
@@ -288,10 +288,10 @@ export const ProcessingParameters = () => {
                 unit="x"
               />
               <RangeInput
-                label="Zoom"
-                min={0.9}
-                max={1.2}
-                step={0.1}
+                label="Zoom (Minimal)"
+                min={0.995}
+                max={1.005}
+                step={0.001}
                 enabled={parameters.zoom.enabled}
                 value={{ min: parameters.zoom.min, max: parameters.zoom.max }}
                 onChange={(value) => updateRangeParameter('zoom', { ...value, enabled: parameters.zoom.enabled })}
@@ -299,10 +299,10 @@ export const ProcessingParameters = () => {
                 unit="x"
               />
               <RangeInput
-                label="Rotation"
-                min={-10}
-                max={10}
-                step={1}
+                label="Rotation (Minimal)"
+                min={-1}
+                max={1}
+                step={0.1}
                 enabled={parameters.rotation.enabled}
                 value={{ min: parameters.rotation.min, max: parameters.rotation.max }}
                 onChange={(value) => updateRangeParameter('rotation', { ...value, enabled: parameters.rotation.enabled })}
@@ -344,10 +344,10 @@ export const ProcessingParameters = () => {
           <AccordionContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <RangeInput
-                label="Trim Start"
+                label="Trim Start (Minimal)"
                 min={0}
-                max={10}
-                step={1}
+                max={1}
+                step={0.1}
                 enabled={parameters.trimStart.enabled}
                 value={{ min: parameters.trimStart.min, max: parameters.trimStart.max }}
                 onChange={(value) => updateRangeParameter('trimStart', { ...value, enabled: parameters.trimStart.enabled })}
@@ -355,10 +355,10 @@ export const ProcessingParameters = () => {
                 unit="s"
               />
               <RangeInput
-                label="Trim End"
+                label="Trim End (Minimal)"
                 min={0}
-                max={10}
-                step={1}
+                max={1}
+                step={0.1}
                 enabled={parameters.trimEnd.enabled}
                 value={{ min: parameters.trimEnd.min, max: parameters.trimEnd.max }}
                 onChange={(value) => updateRangeParameter('trimEnd', { ...value, enabled: parameters.trimEnd.enabled })}
@@ -366,10 +366,10 @@ export const ProcessingParameters = () => {
                 unit="s"
               />
               <RangeInput
-                label="Blurred Border"
+                label="Blurred Border (Subtle)"
                 min={0}
-                max={100}
-                step={5}
+                max={10}
+                step={1}
                 enabled={parameters.blurredBorder.enabled}
                 value={{ min: parameters.blurredBorder.min, max: parameters.blurredBorder.max }}
                 onChange={(value) => updateRangeParameter('blurredBorder', { ...value, enabled: parameters.blurredBorder.enabled })}

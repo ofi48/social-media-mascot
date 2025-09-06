@@ -118,30 +118,42 @@ interface VideoProcessingContextType {
 }
 
 const defaultParameters: ProcessingParameters = {
-  videoBitrate: { min: 1000, max: 15000, enabled: false },
-  saturation: { min: 0.5, max: 1.5, enabled: false },
-  contrast: { min: 0.5, max: 1.5, enabled: false },
-  brightness: { min: -0.3, max: 0.3, enabled: false },
-  gamma: { min: 0.7, max: 1.3, enabled: false },
-  vignette: { min: 0, max: 0.8, enabled: false },
-  noise: { min: 0, max: 0.1, enabled: false },
-  pixelShift: { min: 0, max: 5, enabled: false },
-  speed: { min: 0.5, max: 2.0, enabled: false },
-  zoom: { min: 0.9, max: 1.2, enabled: false },
-  rotation: { min: -10, max: 10, enabled: false },
+  // Subtle bitrate variation (8500-10500 kbps)
+  videoBitrate: { min: 8500, max: 10500, enabled: false },
+  
+  // Very subtle color adjustments to avoid detection
+  saturation: { min: 0.95, max: 1.05, enabled: false },
+  contrast: { min: 0.98, max: 1.02, enabled: false },
+  brightness: { min: -0.02, max: 0.02, enabled: false },
+  gamma: { min: 0.98, max: 1.02, enabled: false },
+  
+  // Minimal visual effects
+  vignette: { min: 0, max: 0.05, enabled: false },
+  noise: { min: 0, max: 0.005, enabled: false },
+  pixelShift: { min: 0, max: 1, enabled: false },
+  
+  // Conservative speed adjustments (preserve duration)
+  speed: { min: 0.98, max: 1.02, enabled: false },
+  zoom: { min: 0.995, max: 1.005, enabled: false },
+  rotation: { min: -0.5, max: 0.5, enabled: false },
   flipHorizontal: false,
+  
+  // Size adjustments (minimal impact)
   customPixelSize: { width: 1280, height: 720, enabled: false },
   randomPixelSize: false,
-  trimStart: { min: 0, max: 10, enabled: false },
-  trimEnd: { min: 0, max: 10, enabled: false },
+  
+  // Very minimal trimming (preserve most of video)
+  trimStart: { min: 0, max: 0.5, enabled: false },
+  trimEnd: { min: 0, max: 0.5, enabled: false },
+  
   usMetadata: false,
-  blurredBorder: { min: 0, max: 100, enabled: false },
+  blurredBorder: { min: 0, max: 5, enabled: false },
   watermark: {
     enabled: false,
-    size: 100,
-    opacity: 0.5,
-    positionX: 0.9,
-    positionY: 0.1
+    size: 12,
+    opacity: 0.1,
+    positionX: 0.95,
+    positionY: 0.05
   }
 };
 
@@ -258,9 +270,11 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
           endTime = Math.min(video.duration, 5); // Default to 5 seconds max
         }
 
-        // Limit clip length for reliability
-        const maxClipSeconds = 3;
-        endTime = Math.min(endTime, startTime + maxClipSeconds);
+        // Preserve most of the video duration for subtle changes
+        const maxClipSeconds = Math.min(video.duration, 30); // Keep up to 30 seconds
+        if (endTime > startTime + maxClipSeconds) {
+          endTime = startTime + maxClipSeconds;
+        }
         
         const duration = endTime - startTime;
         if (duration <= 0) {
@@ -278,8 +292,8 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             let outputMimeType = 'video/mp4';
             const stream = canvas.captureStream(25);
             
-            // Calculate bitrate if enabled
-            let videoBitrate = 2500000; // Default 2.5 Mbps
+            // Calculate bitrate for subtle quality variation
+            let videoBitrate = 9000000; // Default 9 Mbps (middle of range)
             if (params.videoBitrate.enabled) {
               videoBitrate = (Math.random() * (params.videoBitrate.max - params.videoBitrate.min) + params.videoBitrate.min) * 1000; // Convert to bps
             }
@@ -304,7 +318,8 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             
             const chunks: Blob[] = [];
             let frameCount = 0;
-            const maxFrames = Math.ceil(duration * 25); // 25 FPS
+            const targetFPS = 30; // Higher FPS for better quality
+            const maxFrames = Math.ceil(duration * targetFPS);
             
             mediaRecorder.ondataavailable = (event) => {
               if (event.data.size > 0) {
@@ -344,13 +359,13 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
               // Apply transformations
               ctx.translate(canvas.width / 2, canvas.height / 2);
               
-              // Apply rotation if enabled
+              // Apply subtle rotation if enabled
               if (params.rotation.enabled) {
                 const rotation = Math.random() * (params.rotation.max - params.rotation.min) + params.rotation.min;
                 ctx.rotate((rotation * Math.PI) / 180);
               }
               
-              // Apply zoom and flip
+              // Apply very subtle zoom and flip
               let scaleX = 1, scaleY = 1;
               if (params.zoom.enabled) {
                 const zoom = Math.random() * (params.zoom.max - params.zoom.min) + params.zoom.min;
