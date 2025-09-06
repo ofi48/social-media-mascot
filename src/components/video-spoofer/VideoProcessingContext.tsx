@@ -287,44 +287,28 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         
         video.onseeked = () => {
           try {
-            // Set up MediaRecorder with MP4 preference and dynamic bitrate
+            // Set up MediaRecorder with simplified settings for better performance
+            const stream = canvas.captureStream(15); // Lower FPS for better performance
+            
+            // Simplified bitrate - use browser defaults for better compatibility
             let mediaRecorder;
             let outputMimeType = 'video/mp4';
-            const stream = canvas.captureStream(25);
             
-            // Calculate bitrate for subtle quality variation
-            let videoBitrate = 9000000; // Default 9 Mbps (middle of range)
-            if (params.videoBitrate.enabled) {
-              videoBitrate = (Math.random() * (params.videoBitrate.max - params.videoBitrate.min) + params.videoBitrate.min) * 1000; // Convert to bps
-            }
-            
-            // Try MP4 first, then fallback to WebM with safer bitrate settings
+            // Simple MediaRecorder setup without custom bitrates
             if (MediaRecorder.isTypeSupported('video/mp4')) {
-              try {
-                mediaRecorder = new MediaRecorder(stream, { 
-                  mimeType: 'video/mp4',
-                  videoBitsPerSecond: Math.min(videoBitrate, 5000000) // Cap at 5 Mbps to prevent errors
-                });
-                outputMimeType = 'video/mp4';
-              } catch (error) {
-                console.log('MP4 with bitrate failed, trying without bitrate setting');
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
-                outputMimeType = 'video/mp4';
-              }
+              mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
+              outputMimeType = 'video/mp4';
             } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
               mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
               outputMimeType = 'video/webm';
-            } else if (MediaRecorder.isTypeSupported('video/webm')) {
-              mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-              outputMimeType = 'video/webm';
             } else {
-              mediaRecorder = new MediaRecorder(stream);
+              mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
               outputMimeType = 'video/webm';
             }
             
             const chunks: Blob[] = [];
             let frameCount = 0;
-            const targetFPS = 30; // Higher FPS for better quality
+            const targetFPS = 15; // Reduced FPS for performance
             const maxFrames = Math.ceil(duration * targetFPS);
             
             mediaRecorder.ondataavailable = (event) => {
@@ -334,14 +318,26 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             };
             
             mediaRecorder.onstop = () => {
-              const processedBlob = new Blob(chunks, { type: outputMimeType });
-              URL.revokeObjectURL(videoUrl);
-              resolve(processedBlob);
+              try {
+                const processedBlob = new Blob(chunks, { type: outputMimeType });
+                // Clean up resources
+                chunks.length = 0;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                URL.revokeObjectURL(videoUrl);
+                resolve(processedBlob);
+              } catch (error) {
+                URL.revokeObjectURL(videoUrl);
+                reject(new Error('Failed to create processed video blob'));
+              }
             };
             
             mediaRecorder.onerror = (event) => {
+              // Clean up resources on error
+              const tracks = stream.getTracks();
+              tracks.forEach(track => track.stop());
               URL.revokeObjectURL(videoUrl);
-              reject(new Error('MediaRecorder error: ' + event));
+              reject(new Error('MediaRecorder failed during recording'));
             };
             
             // Generate constant effect values once for the entire video
@@ -559,8 +555,14 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
     try {
       const variants = [] as any[];
       
+      // Process videos sequentially with delay to prevent browser overload
       for (let i = 0; i < variations; i++) {
         try {
+          // Add small delay between processing to prevent browser freeze
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
           const processedBlob = await applyVideoProcessing(file, parameters);
           variants.push({
             id: Math.random().toString(36).substr(2, 9),
@@ -568,10 +570,11 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
             blob: processedBlob,
             originalFile: file
           });
+          
+          console.log(`Successfully processed variant ${i + 1}/${variations}`);
         } catch (error) {
           console.error(`Error processing variant ${i + 1}:`, error);
-          console.error('Processing error details:', error.message);
-          // Skip failed variants instead of creating fallback
+          // Continue processing other variants instead of failing completely
         } finally {
           // Update progress regardless of success/failure
           const pct = Math.round(((i + 1) / variations) * 100);
@@ -579,7 +582,7 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
       }
       
-      // Only save result if we have at least one successful variant
+      // Save result even if some variants failed, as long as we have at least one
       if (variants.length > 0) {
         const result: ProcessedResult = {
           id: Math.random().toString(36).substr(2, 9),
@@ -589,17 +592,15 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         };
         
         addResult(result);
-        console.log(`Successfully processed ${variants.length} out of ${variations} variants`);
+        console.log(`Processing completed: ${variants.length}/${variations} variants successful`);
       } else {
-        console.error('No variants were successfully processed');
-        throw new Error(`Failed to process any variants. Please try with different settings or check if the video file is valid.`);
+        throw new Error(`All ${variations} variants failed to process. Try reducing effects or using a different video file.`);
       }
       
       setProcessingProgress(100);
     } catch (error) {
       console.error('Video processing failed:', error);
       setProcessingProgress(0);
-      // Rethrow to show error to user
       throw error;
     } finally {
       setIsProcessing(false);
