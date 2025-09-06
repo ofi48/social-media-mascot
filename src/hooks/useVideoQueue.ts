@@ -30,7 +30,7 @@ export function useVideoQueue(): UseVideoQueueReturn {
 
     setQueue(prev => [...prev, ...newJobs]);
     safeLog('Added files to queue', { count: files.length });
-    toast.success(`Added ${files.length} video${files.length > 1 ? 's' : ''} to queue`);
+    toast.success(`Se añadieron ${files.length} video${files.length > 1 ? 's' : ''} a la cola`);
   }, []);
 
   const removeFromQueue = useCallback((jobId: string) => {
@@ -56,7 +56,7 @@ export function useVideoQueue(): UseVideoQueueReturn {
 
     setQueue([]);
     safeLog('Cleared queue');
-    toast.success('Queue cleared');
+    toast.success('Cola limpiada');
   }, [queue]);
 
   const retryJob = useCallback((jobId: string) => {
@@ -82,13 +82,13 @@ export function useVideoQueue(): UseVideoQueueReturn {
     variationsPerVideo: number
   ) => {
     if (isProcessing) {
-      toast.error('Batch processing already in progress');
+      toast.error('Ya hay un procesamiento por lotes en progreso');
       return;
     }
 
     const waitingJobs = queue.filter(job => job.status === 'waiting');
     if (waitingJobs.length === 0) {
-      toast.error('No videos in queue to process');
+      toast.error('No hay videos en la cola para procesar');
       return;
     }
 
@@ -193,9 +193,9 @@ export function useVideoQueue(): UseVideoQueueReturn {
     const errorCount = queue.filter(job => job.status === 'error').length;
     
     if (errorCount === 0) {
-      toast.success(`Batch processing completed! Processed ${completedCount} videos.`);
+      toast.success(`¡Procesamiento por lotes completado! Se procesaron ${completedCount} videos.`);
     } else {
-      toast.warning(`Batch processing finished with ${errorCount} errors. ${completedCount} videos processed successfully.`);
+      toast.warning(`Procesamiento por lotes finalizado con ${errorCount} errores. ${completedCount} videos procesados exitosamente.`);
     }
 
     safeLog('Batch processing completed', { completedCount, errorCount });

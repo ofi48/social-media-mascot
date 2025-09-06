@@ -106,14 +106,14 @@ export function useVideoProcessing(): UseVideoProcessingReturn {
         resultCount: processedResults.length 
       });
 
-      toast.success(`Successfully processed ${numCopies} video variation${numCopies > 1 ? 's' : ''}`);
+      toast.success(`¡Video procesado exitosamente! Se generaron ${numCopies} variación${numCopies > 1 ? 'es' : ''}.`);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Processing failed';
       setError(errorMessage);
       setProgress(0);
       safeLog('Video processing failed', { error: errorMessage });
-      toast.error(`Processing failed: ${errorMessage}`);
+      toast.error(`Error al procesar video: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }

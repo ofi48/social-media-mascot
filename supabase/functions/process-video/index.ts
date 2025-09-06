@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -107,32 +108,61 @@ async function simulateVideoProcessing(
   requestId: string
 ): Promise<Array<{name: string, url: string, processingDetails: any}>> {
   
-  // Simulate processing delay
-  await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+  // Initialize Supabase client
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseKey)
+  
+  console.log(`[${requestId}] Starting processing of ${numCopies} variations`);
   
   const results = [];
+  const videoBuffer = await videoFile.arrayBuffer();
   
   for (let i = 0; i < numCopies; i++) {
-    // Generate mock processing details
-    const processingDetails = generateMockProcessingDetails(settings, i);
-    
-    // Use sample videos for demo purposes (these are actual working video URLs)
-    const demoVideos = [
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
-    ];
-    const mockUrl = demoVideos[i % demoVideos.length];
-    
-    results.push({
-      name: `${videoFile.name.split('.')[0]}_variation_${i + 1}.mp4`,
-      url: mockUrl,
-      processingDetails: processingDetails
-    });
-    
-    console.log(`[${requestId}] Generated variation ${i + 1}/${numCopies}`);
+    try {
+      // Generate mock processing details
+      const processingDetails = generateMockProcessingDetails(settings, i);
+      
+      // Create a filename for the processed video
+      const originalName = videoFile.name.split('.')[0];
+      const extension = videoFile.name.split('.').pop() || 'mp4';
+      const processedFileName = `${originalName}_variation_${i + 1}_${requestId}.${extension}`;
+      const filePath = `videos/${processedFileName}`;
+      
+      console.log(`[${requestId}] Processing variation ${i + 1}/${numCopies}: ${processedFileName}`);
+      
+      // For now, we'll save the original video as the "processed" version
+      // In production, this is where you'd apply FFmpeg transformations
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('processed-videos')
+        .upload(filePath, videoBuffer, {
+          contentType: videoFile.type,
+          upsert: true
+        });
+      
+      if (uploadError) {
+        console.error(`[${requestId}] Upload error for variation ${i + 1}:`, uploadError);
+        throw new Error(`Failed to upload variation ${i + 1}: ${uploadError.message}`);
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('processed-videos')
+        .getPublicUrl(filePath);
+      
+      results.push({
+        name: processedFileName,
+        url: urlData.publicUrl,
+        processingDetails: processingDetails,
+        filePath: filePath
+      });
+      
+      console.log(`[${requestId}] Successfully processed variation ${i + 1}/${numCopies}`);
+      
+    } catch (error) {
+      console.error(`[${requestId}] Error processing variation ${i + 1}:`, error);
+      // Continue with other variations even if one fails
+    }
   }
   
   return results;
