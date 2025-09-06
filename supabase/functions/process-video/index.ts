@@ -134,9 +134,9 @@ async function processVideoOnRailway(
     
     console.log(`[${requestId}] Sending request to Railway: ${railwayUrl}`);
     
-    // Enhanced timeout and retry logic for Railway request
+    // Enhanced timeout and retry logic for Railway request - increased to 8 minutes for larger files
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Railway processing timeout (3 minutes)')), 180000)
+      setTimeout(() => reject(new Error('Railway processing timeout (8 minutes)')), 480000)
     );
 
     const response = await Promise.race([
