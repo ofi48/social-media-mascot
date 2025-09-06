@@ -579,15 +579,28 @@ export const VideoProcessingProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
       }
       
-      const result: ProcessedResult = {
-        id: Math.random().toString(36).substr(2, 9),
-        originalFilename: file.name,
-        variants: variants,
-        timestamp: new Date()
-      };
+      // Only save result if we have at least one successful variant
+      if (variants.length > 0) {
+        const result: ProcessedResult = {
+          id: Math.random().toString(36).substr(2, 9),
+          originalFilename: file.name,
+          variants: variants,
+          timestamp: new Date()
+        };
+        
+        addResult(result);
+        console.log(`Successfully processed ${variants.length} out of ${variations} variants`);
+      } else {
+        console.error('No variants were successfully processed');
+        throw new Error(`Failed to process any variants. Please try with different settings or check if the video file is valid.`);
+      }
       
-      addResult(result);
       setProcessingProgress(100);
+    } catch (error) {
+      console.error('Video processing failed:', error);
+      setProcessingProgress(0);
+      // Rethrow to show error to user
+      throw error;
     } finally {
       setIsProcessing(false);
     }
