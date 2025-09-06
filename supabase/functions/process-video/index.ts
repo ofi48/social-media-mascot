@@ -131,7 +131,7 @@ async function createVideoVariations(
     console.log(`[${requestId}] Uploading original video to: ${originalPath}`);
     
     const { data: originalUpload, error: originalError } = await supabase.storage
-      .from('videos')
+      .from('processed-videos')
       .upload(originalPath, videoFile, {
         contentType: videoFile.type,
         upsert: true
@@ -158,7 +158,7 @@ async function createVideoVariations(
         
         // Create variation by copying the original file with new name
         const { data: copyData, error: copyError } = await supabase.storage
-          .from('videos')
+          .from('processed-videos')
           .copy(originalPath, variationPath);
         
         if (copyError) {
@@ -166,7 +166,7 @@ async function createVideoVariations(
           
           // Fallback: upload the file again
           const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('videos')
+            .from('processed-videos')
             .upload(variationPath, videoFile, {
               contentType: videoFile.type,
               upsert: true
@@ -180,7 +180,7 @@ async function createVideoVariations(
         
         // Get public URL for the variation
         const { data: urlData } = supabase.storage
-          .from('videos')
+          .from('processed-videos')
           .getPublicUrl(variationPath);
         
         if (!urlData.publicUrl) {
@@ -207,7 +207,7 @@ async function createVideoVariations(
     
     // Clean up original file after processing
     try {
-      await supabase.storage.from('videos').remove([originalPath]);
+      await supabase.storage.from('processed-videos').remove([originalPath]);
       console.log(`[${requestId}] Cleaned up original file`);
     } catch (error) {
       console.warn(`[${requestId}] Failed to clean up original file:`, error);
